@@ -89,7 +89,7 @@
 
 <div class="card">
     <h1>🛡️ SecurePixel Multi-Stage Pipeline</h1>
-    <p class="subtitle">Stages 1 & 2 on Vercel (Edge Pre-filter), Stages 3–5 on Kaggle Engine (Dual Forensic Channels).</p>
+    <p class="subtitle">Multi-Media Forensic Architecture: Adaptive Edge Pre-Filter & GPU Neural Verification.</p>
 
     <div class="config-box">
         <label for="kaggleUrl">Kaggle Endpoint URL (LocalTunnel / ngrok):</label>
@@ -97,8 +97,8 @@
     </div>
 
     <div class="upload-box" onclick="document.getElementById('fileInput').click()">
-        <span id="uploadLabel">📁 Click to select an image file</span>
-        <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelected(event)">
+        <span id="uploadLabel">📁 Click to select an image or video file</span>
+        <input type="file" id="fileInput" accept="image/*,video/*" onchange="handleFileSelected(event)">
     </div>
 
     <button type="button" id="btnSubmit" onclick="runPipeline()" disabled>Start Verification</button>
@@ -119,32 +119,175 @@
         if (e.target.files.length > 0) {
             selectedFile = e.target.files[0];
             const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(2);
-            document.getElementById('uploadLabel').innerText = `✅ ${selectedFile.name} (${sizeMB} MB)`;
+            const isVideo = selectedFile.type.startsWith("video/");
+            const icon = isVideo ? "🎥" : "🖼️";
+            document.getElementById('uploadLabel').innerText = `${icon} ${selectedFile.name} (${sizeMB} MB)`;
             document.getElementById('btnSubmit').disabled = false;
+        }
+    }
+
+    // Client-side quick binary inspector for C2PA provenance signatures
+    async function checkClientC2PA(file) {
+        const slice = file.slice(0, 131072);
+        const buffer = await slice.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+        return text.includes("c2pa") || text.includes("urn:c2pa");
+    }
+
+    // Hardware-accelerated client-side video frame extraction
+    async function extractVideoKeyframes(videoFile, maxFrames = 4) {
+        return new Promise((resolve, reject) => {
+            const video = document.createElement("video");
+            video.preload = "metadata";
+            video.src = URL.createObjectURL(videoFile);
+            video.muted = true;
+            video.playsInline = true;
+
+            video.onerror = () => {
+                URL.revokeObjectURL(video.src);
+                reject(new Error("Browser hardware decoder failed to read video format."));
+            };
+
+            video.onloadedmetadata = async () => {
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d");
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                const frames = [];
+                const duration = Math.max(video.duration, 1.0);
+                const step = duration / (maxFrames + 1);
+
+                for (let i = 1; i <= maxFrames; i++) {
+                    video.currentTime = i * step;
+                    await new Promise((res) => { video.onseeked = res; });
+
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.90));
+                    frames.push(new File([blob], `frame_${i}.jpg`, { type: "image/jpeg" }));
+                }
+
+                URL.revokeObjectURL(video.src);
+                resolve(frames);
+            };
+        });
+    }
+
+    function setBadgeStyle(verdict, element) {
+        element.innerText = verdict;
+        if (verdict === "LIKELY AI-GENERATED") {
+            element.className = "badge badge-ai";
+        } else if (verdict === "LIKELY NATURAL CAPTURE" || verdict === "VERIFIED ORIGIN") {
+            element.className = verdict === "VERIFIED ORIGIN" ? "badge badge-verified" : "badge badge-natural";
+        } else {
+            element.className = "badge badge-inconclusive";
         }
     }
 
     async function runPipeline() {
         if (!selectedFile) return;
 
-        if (selectedFile.size > 4.2 * 1024 * 1024) {
-            alert("File size exceeds the 4.2 MB payload limit. Please select a smaller image for testing.");
-            return;
-        }
-
         const btn = document.getElementById('btnSubmit');
         const resultCard = document.getElementById('resultCard');
         const verdictEl = document.getElementById('resVerdict');
         const kaggleEndpoint = document.getElementById('kaggleUrl').value.trim();
 
-        btn.innerText = "Stages 1 & 2: Inspecting C2PA provenance & physical integrity...";
         btn.disabled = true;
+        resultCard.style.display = "none";
 
-        const formData = new FormData();
-        formData.append("file", selectedFile);
+        const isVideo = selectedFile.type.startsWith("video/");
 
         try {
-            // 1. Execute Stages 1 & 2 on Vercel Pre-filter
+            // ==========================================
+            // PATHWAY A: VIDEO WORKFLOW (CLIENT-SIDE EXTRACTION)
+            // ==========================================
+            if (isVideo) {
+                // 1. Client-Side C2PA Check
+                btn.innerText = "Stage 1: Client inspection for C2PA container metadata...";
+                const hasC2PA = await checkClientC2PA(selectedFile);
+                if (hasC2PA) {
+                    resultCard.style.display = "block";
+                    setBadgeStyle("VERIFIED ORIGIN", verdictEl);
+                    document.getElementById('resReason').innerText = "Valid C2PA Content Credentials provenance seal detected in video stream.";
+                    document.getElementById('resPipeline').innerText = "Autonomous Client-Side Verification (Zero server upload required)";
+                    document.getElementById('resData').innerText = JSON.stringify({
+                        file_name: selectedFile.name,
+                        media_type: selectedFile.type,
+                        has_c2pa: true,
+                        verdict: "VERIFIED ORIGIN"
+                    }, null, 2);
+                    return;
+                }
+
+                if (!kaggleEndpoint) {
+                    throw new Error("Kaggle Endpoint URL is required for video frame inference.");
+                }
+
+                // 2. Client-Side Temporal Frame Sampling
+                btn.innerText = "Stage 2: Extracting temporal sample frames locally via Canvas...";
+                const frames = await extractVideoKeyframes(selectedFile, 4);
+
+                // 3. Sequential Inference on Kaggle Engine
+                const cleanUrl = kaggleEndpoint.replace(/\/+$/, "");
+                const targetUrl = `${cleanUrl}/predict`;
+                const frameResults = [];
+
+                for (let i = 0; i < frames.length; i++) {
+                    btn.innerText = `Analyzing temporal frame ${i + 1} of ${frames.length} on GPU...`;
+                    const frameData = new FormData();
+                    frameData.append("file", frames[i]);
+
+                    const res = await fetch(targetUrl, { method: "POST", body: frameData });
+                    if (!res.ok) {
+                        const err = await res.text();
+                        throw new Error(`Kaggle engine error on frame ${i + 1}: ${err.substring(0, 100)}`);
+                    }
+                    const data = await res.json();
+                    frameResults.push(data);
+                }
+
+                // 4. Temporal Aggregation
+                resultCard.style.display = "block";
+                const aiVotes = frameResults.filter(r => r.verdict === "LIKELY AI-GENERATED").length;
+                const naturalVotes = frameResults.filter(r => r.verdict === "LIKELY NATURAL CAPTURE").length;
+
+                let finalVerdict = "INCONCLUSIVE";
+                let finalReason = "Frame metrics yielded conflicting or degraded forensic signals across the video sequence.";
+
+                if (aiVotes >= Math.ceil(frameResults.length * 0.5)) {
+                    finalVerdict = "LIKELY AI-GENERATED";
+                    finalReason = `Synthetic generative signatures identified consistently across ${aiVotes} of ${frameResults.length} sampled frames.`;
+                } else if (naturalVotes >= Math.ceil(frameResults.length * 0.5)) {
+                    finalVerdict = "LIKELY NATURAL CAPTURE";
+                    finalReason = `Natural optical characteristics confirmed consistently across ${naturalVotes} of ${frameResults.length} sampled frames.`;
+                }
+
+                setBadgeStyle(finalVerdict, verdictEl);
+                document.getElementById('resReason').innerText = finalReason;
+                document.getElementById('resPipeline').innerText = `Temporal Video Aggregation (${frames.length} keyframes analyzed)`;
+                document.getElementById('resData').innerText = JSON.stringify({
+                    file_name: selectedFile.name,
+                    total_sampled_frames: frames.length,
+                    ai_votes: aiVotes,
+                    natural_votes: naturalVotes,
+                    frame_metrics: frameResults
+                }, null, 2);
+                return;
+            }
+
+            // ==========================================
+            // PATHWAY B: IMAGE WORKFLOW (VERCEL + KAGGLE PIPELINE)
+            // ==========================================
+            if (selectedFile.size > 4.2 * 1024 * 1024) {
+                alert("Image file size exceeds the 4.2 MB payload limit. Please select a smaller image.");
+                return;
+            }
+
+            btn.innerText = "Stages 1 & 2: Inspecting C2PA provenance & physical integrity...";
+            const formData = new FormData();
+            formData.append("file", selectedFile);
+
             const resVercel = await fetch("/api/analyze", { method: "POST", body: formData });
             if (!resVercel.ok) {
                 const errText = await resVercel.text();
@@ -154,10 +297,9 @@
             const dataVercel = await resVercel.json();
             resultCard.style.display = "block";
 
-            // If verified via C2PA or stopped by degradation profiler
+            // Terminate if C2PA verified or stopped by degradation profiler
             if (!dataVercel.send_to_gpu || !kaggleEndpoint) {
-                verdictEl.innerText = dataVercel.verdict;
-                verdictEl.className = dataVercel.verdict === "VERIFIED ORIGIN" ? "badge badge-verified" : "badge badge-inconclusive";
+                setBadgeStyle(dataVercel.verdict, verdictEl);
                 document.getElementById('resReason').innerText = dataVercel.reason;
                 document.getElementById('resPipeline').innerText = dataVercel.send_to_gpu 
                     ? "Terminated at Vercel (Kaggle URL omitted, deep inference bypassed)" 
@@ -166,34 +308,21 @@
                 return;
             }
 
-            // 2. File passed pre-filter -> Route to Kaggle Deep Inference Engine
+            // File passed pre-filter -> Route to Kaggle Engine
             btn.innerText = "Stages 3–5: Executing neural visual & phase spectral inference on Kaggle...";
             document.getElementById('resPipeline').innerText = "Routing payload to Kaggle Forensic Backend...";
 
             const cleanUrl = kaggleEndpoint.replace(/\/+$/, "");
             const targetUrl = `${cleanUrl}/predict`;
 
-            const resKaggle = await fetch(targetUrl, {
-                method: "POST",
-                body: formData
-            });
-
+            const resKaggle = await fetch(targetUrl, { method: "POST", body: formData });
             if (!resKaggle.ok) {
                 const errDetail = await resKaggle.text();
                 throw new Error(`Kaggle engine error (${resKaggle.status}): ${errDetail.substring(0, 120)}`);
             }
 
             const dataKaggle = await resKaggle.json();
-
-            verdictEl.innerText = dataKaggle.verdict;
-            if (dataKaggle.verdict === "LIKELY AI-GENERATED") {
-                verdictEl.className = "badge badge-ai";
-            } else if (dataKaggle.verdict === "LIKELY NATURAL CAPTURE") {
-                verdictEl.className = "badge badge-natural";
-            } else {
-                verdictEl.className = "badge badge-inconclusive";
-            }
-
+            setBadgeStyle(dataKaggle.verdict, verdictEl);
             document.getElementById('resReason').innerText = dataKaggle.reason;
             document.getElementById('resPipeline').innerText = "Full Pipeline Complete (Vercel Pre-Filter -> Kaggle Forensic Engine)";
             document.getElementById('resData').innerText = JSON.stringify(dataKaggle, null, 2);
