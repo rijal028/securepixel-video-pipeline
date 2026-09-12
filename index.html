@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecurePixel - Multi-Stage Forensic Pipeline</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            max-width: 680px; 
+            margin: 40px auto; 
+            padding: 20px; 
+            background: #0f172a; 
+            color: #f8fafc; 
+        }
+        .card { 
+            background: #1e293b; 
+            padding: 30px; 
+            border-radius: 16px; 
+            border: 1px solid #334155; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4); 
+        }
+        h1 { margin-top: 0; font-size: 22px; color: #38bdf8; }
+        p.subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
+        .config-box { 
+            margin-bottom: 20px; 
+            background: #0f172a; 
+            padding: 12px; 
+            border-radius: 8px; 
+            border: 1px solid #334155; 
+        }
+        .config-box label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 6px; font-weight: 600; }
+        .config-box input { 
+            width: 100%; 
+            background: #1e293b; 
+            border: 1px solid #475569; 
+            color: #f8fafc; 
+            padding: 10px; 
+            border-radius: 6px; 
+            font-size: 13px; 
+        }
+        .upload-box { 
+            border: 2px dashed #475569; 
+            padding: 25px; 
+            border-radius: 12px; 
+            text-align: center; 
+            cursor: pointer; 
+            background: #0f172a; 
+            margin-bottom: 20px; 
+        }
+        input[type="file"] { display: none; }
+        button { 
+            background: #0284c7; 
+            color: white; 
+            border: none; 
+            padding: 12px 20px; 
+            font-weight: 600; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            width: 100%; 
+            font-size: 15px; 
+        }
+        button:hover { background: #0369a1; }
+        button:disabled { background: #475569; cursor: not-allowed; }
+        #resultCard { 
+            display: none; 
+            margin-top: 25px; 
+            padding-top: 20px; 
+            border-top: 1px solid #334155; 
+        }
+        .badge { display: inline-block; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: bold; }
+        .badge-verified { background: #065f46; color: #34d399; }
+        .badge-inconclusive { background: #7f1d1d; color: #fca5a5; }
+        .badge-ai { background: #991b1b; color: #fca5a5; }
+        .badge-natural { background: #065f46; color: #6ee7b7; }
+        pre { 
+            background: #0b0f19; 
+            color: #a5f3fc; 
+            padding: 15px; 
+            border-radius: 8px; 
+            font-size: 12px; 
+            overflow-x: auto; 
+            border: 1px solid #1e293b; 
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>🛡️ SecurePixel Multi-Stage Pipeline</h1>
+    <p class="subtitle">Stages 1 & 2 on Vercel (Edge Pre-filter), Stages 3–5 on Kaggle Engine (Dual Forensic Channels).</p>
+
+    <div class="config-box">
+        <label for="kaggleUrl">Kaggle Endpoint URL (LocalTunnel / ngrok):</label>
+        <input type="text" id="kaggleUrl" placeholder="https://xxxx-xxxx.loca.lt">
+    </div>
+
+    <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+        <span id="uploadLabel">📁 Click to select an image file</span>
+        <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelected(event)">
+    </div>
+
+    <button type="button" id="btnSubmit" onclick="runPipeline()" disabled>Start Verification</button>
+
+    <div id="resultCard">
+        <p><strong>Final Verdict:</strong> <span id="resVerdict" class="badge"></span></p>
+        <p><strong>Forensic Rationale:</strong> <span id="resReason" style="color: #cbd5e1;"></span></p>
+        <p><strong>Execution Route:</strong> <span id="resPipeline" style="color: #38bdf8;"></span></p>
+        <p style="margin-top: 15px; font-size: 13px; color: #94a3b8;">Detailed Forensic Metrics:</p>
+        <pre id="resData"></pre>
+    </div>
+</div>
+
+<script>
+    let selectedFile = null;
+
+    function handleFileSelected(e) {
+        if (e.target.files.length > 0) {
+            selectedFile = e.target.files[0];
+            const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(2);
+            document.getElementById('uploadLabel').innerText = `✅ ${selectedFile.name} (${sizeMB} MB)`;
+            document.getElementById('btnSubmit').disabled = false;
+        }
+    }
+
+    async function runPipeline() {
+        if (!selectedFile) return;
+
+        if (selectedFile.size > 4.2 * 1024 * 1024) {
+            alert("File size exceeds the 4.2 MB payload limit. Please select a smaller image for testing.");
+            return;
+        }
+
+        const btn = document.getElementById('btnSubmit');
+        const resultCard = document.getElementById('resultCard');
+        const verdictEl = document.getElementById('resVerdict');
+        const kaggleEndpoint = document.getElementById('kaggleUrl').value.trim();
+
+        btn.innerText = "Stages 1 & 2: Inspecting C2PA provenance & physical integrity...";
+        btn.disabled = true;
+
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+
+        try {
+            // 1. Execute Stages 1 & 2 on Vercel Pre-filter
+            const resVercel = await fetch("/api/analyze", { method: "POST", body: formData });
+            if (!resVercel.ok) {
+                const errText = await resVercel.text();
+                throw new Error(`Vercel pre-filter error (${resVercel.status}): ${errText}`);
+            }
+
+            const dataVercel = await resVercel.json();
+            resultCard.style.display = "block";
+
+            // If verified via C2PA or stopped by degradation profiler
+            if (!dataVercel.send_to_gpu || !kaggleEndpoint) {
+                verdictEl.innerText = dataVercel.verdict;
+                verdictEl.className = dataVercel.verdict === "VERIFIED ORIGIN" ? "badge badge-verified" : "badge badge-inconclusive";
+                document.getElementById('resReason').innerText = dataVercel.reason;
+                document.getElementById('resPipeline').innerText = dataVercel.send_to_gpu 
+                    ? "Terminated at Vercel (Kaggle URL omitted, deep inference bypassed)" 
+                    : "Terminated at Vercel (Autonomous Edge Pre-Filter)";
+                document.getElementById('resData').innerText = JSON.stringify(dataVercel, null, 2);
+                return;
+            }
+
+            // 2. File passed pre-filter -> Route to Kaggle Deep Inference Engine
+            btn.innerText = "Stages 3–5: Executing neural visual & phase spectral inference on Kaggle...";
+            document.getElementById('resPipeline').innerText = "Routing payload to Kaggle Forensic Backend...";
+
+            const cleanUrl = kaggleEndpoint.replace(/\/+$/, "");
+            const targetUrl = `${cleanUrl}/predict`;
+
+            const resKaggle = await fetch(targetUrl, {
+                method: "POST",
+                body: formData
+            });
+
+            if (!resKaggle.ok) {
+                const errDetail = await resKaggle.text();
+                throw new Error(`Kaggle engine error (${resKaggle.status}): ${errDetail.substring(0, 120)}`);
+            }
+
+            const dataKaggle = await resKaggle.json();
+
+            verdictEl.innerText = dataKaggle.verdict;
+            if (dataKaggle.verdict === "LIKELY AI-GENERATED") {
+                verdictEl.className = "badge badge-ai";
+            } else if (dataKaggle.verdict === "LIKELY NATURAL CAPTURE") {
+                verdictEl.className = "badge badge-natural";
+            } else {
+                verdictEl.className = "badge badge-inconclusive";
+            }
+
+            document.getElementById('resReason').innerText = dataKaggle.reason;
+            document.getElementById('resPipeline').innerText = "Full Pipeline Complete (Vercel Pre-Filter -> Kaggle Forensic Engine)";
+            document.getElementById('resData').innerText = JSON.stringify(dataKaggle, null, 2);
+
+        } catch (err) {
+            alert("System exception: " + err.message);
+        } finally {
+            btn.innerText = "Start Verification";
+            btn.disabled = false;
+        }
+    }
+</script>
+
+</body>
+</html>
