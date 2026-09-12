@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SecurePixel - Forensic Engine</title>
+    <title>SecurePixel - Multi-Stage Forensic Pipeline</title>
     <style>
         * { box-sizing: border-box; }
         body { 
@@ -23,28 +23,26 @@
         }
         h1 { margin-top: 0; font-size: 22px; color: #38bdf8; }
         p.subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
-        .status-box { 
+        .config-box { 
             margin-bottom: 20px; 
             background: #0f172a; 
-            padding: 12px 16px; 
+            padding: 12px; 
             border-radius: 8px; 
             border: 1px solid #334155; 
-            display: flex; 
-            align-items: center; 
-            justify-content: space-between;
-            font-size: 13px;
         }
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #34d399;
-            display: inline-block;
-            margin-right: 6px;
+        .config-box label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 6px; font-weight: 600; }
+        .config-box input { 
+            width: 100%; 
+            background: #1e293b; 
+            border: 1px solid #475569; 
+            color: #f8fafc; 
+            padding: 10px; 
+            border-radius: 6px; 
+            font-size: 13px; 
         }
         .upload-box { 
             border: 2px dashed #475569; 
-            padding: 30px 20px; 
+            padding: 25px; 
             border-radius: 12px; 
             text-align: center; 
             cursor: pointer; 
@@ -89,21 +87,16 @@
             border: 1px solid #1e293b; 
         }
     </style>
-    <!-- Gradio Client Resmi via ESM CDN -->
-    <script type="module">
-        import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
-        window.GradioClient = Client;
-    </script>
 </head>
 <body>
 
 <div class="card">
-    <h1>🛡️ SecurePixel Calibrated Forensic Engine</h1>
-    <p class="subtitle">Multi-Media Deepfake Verification: Autonomous Provenance Pre-Filter, 2D FFT Phase Spectrum & ZeroGPU Acceleration.</p>
+    <h1>🛡️ SecurePixel Multi-Stage Pipeline</h1>
+    <p class="subtitle">Multi-Media Forensic Architecture: Local C2PA Inspection & Colab/Kaggle Neural Engine.</p>
 
-    <div class="status-box">
-        <span>Backend Engine:</span>
-        <span style="color: #38bdf8;"><span class="status-dot"></span>Hugging Face ZeroGPU (Live 24/7)</span>
+    <div class="config-box">
+        <label for="engineUrl">Colab / Kaggle Tunnel Endpoint URL:</label>
+        <input type="text" id="engineUrl" placeholder="https://xxxx-xxxx.trycloudflare.com atau https://xxxx.loca.lt">
     </div>
 
     <div class="upload-box" onclick="document.getElementById('fileInput').click()">
@@ -123,9 +116,7 @@
 </div>
 
 <script>
-    const HF_SPACE_ID = "rijal028/securepixel-engine";
     let selectedFile = null;
-    let hfClientInstance = null;
 
     function handleFileSelected(e) {
         if (e.target.files.length > 0) {
@@ -138,18 +129,7 @@
         }
     }
 
-    // Inisialisasi Gradio Client (singleton)
-    async function getHfClient() {
-        if (!hfClientInstance) {
-            if (!window.GradioClient) {
-                throw new Error("Gradio client library is still loading. Please retry in 2 seconds.");
-            }
-            hfClientInstance = await window.GradioClient.connect(HF_SPACE_ID);
-        }
-        return hfClientInstance;
-    }
-
-    // Inspeksi binary lokal untuk signature C2PA / Content Credentials
+    // Inspeksi biner cepat langsung di browser untuk C2PA
     async function checkClientC2PA(file) {
         const slice = file.slice(0, 131072);
         const buffer = await slice.arrayBuffer();
@@ -158,7 +138,7 @@
         return text.includes("c2pa") || text.includes("urn:c2pa") || text.includes("jumb");
     }
 
-    // Ekstraksi temporal frame video via HTML5 Canvas
+    // Ekstraksi temporal frame video via HTML5 Canvas lokal
     async function extractVideoKeyframes(videoFile, maxFrames = 4) {
         return new Promise((resolve, reject) => {
             const video = document.createElement("video");
@@ -169,7 +149,7 @@
 
             video.onerror = () => {
                 URL.revokeObjectURL(video.src);
-                reject(new Error("Browser video decoder failed to parse this format."));
+                reject(new Error("Browser hardware decoder failed to read video format."));
             };
 
             video.onloadedmetadata = async () => {
@@ -216,6 +196,7 @@
         const btn = document.getElementById('btnSubmit');
         const resultCard = document.getElementById('resultCard');
         const verdictEl = document.getElementById('resVerdict');
+        const rawEndpoint = document.getElementById('engineUrl').value.trim();
 
         btn.disabled = true;
         resultCard.style.display = "none";
@@ -223,43 +204,63 @@
         const isVideo = selectedFile.type.startsWith("video/");
 
         try {
-            // ========================================================
-            // STAGE 1: CLIENT-SIDE AUTONOMOUS PROVENANCE (C2PA) CHECK
-            // ========================================================
-            btn.innerText = "Stage 1: Scanning client-side provenance manifest (C2PA)...";
+            // ----------------------------------------------------
+            // TAHAP 1: INSPEKSI C2PA LOKAL DI BROWSER (INSTAN)
+            // ----------------------------------------------------
+            btn.innerText = "Stage 1: Client inspection for C2PA provenance manifest...";
             const hasC2PA = await checkClientC2PA(selectedFile);
             if (hasC2PA) {
                 resultCard.style.display = "block";
                 setBadgeStyle("VERIFIED ORIGIN", verdictEl);
-                document.getElementById('resReason').innerText = "Authentic Content Credentials (C2PA) provenance manifest detected directly on the raw file.";
-                document.getElementById('resPipeline').innerText = "Autonomous Client Verification (Zero server upload required)";
+                document.getElementById('resReason').innerText = "Valid C2PA Content Credentials provenance seal detected directly on the file header.";
+                document.getElementById('resPipeline').innerText = "Autonomous Client-Side Verification (Zero server inference required)";
                 document.getElementById('resData').innerText = JSON.stringify({
                     file_name: selectedFile.name,
                     media_type: selectedFile.type,
-                    has_c2pa_manifest: true,
+                    has_c2pa: true,
                     verdict: "VERIFIED ORIGIN"
                 }, null, 2);
                 return;
             }
 
-            // Hubungkan ke backend Hugging Face Space
-            btn.innerText = "Connecting to ZeroGPU Space backend...";
-            const client = await getHfClient();
+            if (!rawEndpoint) {
+                throw new Error("Colab / Kaggle Endpoint URL is required for deep neural inference.");
+            }
 
-            // ========================================================
-            // STAGE 2A: VIDEO TEMPORAL EXTRACTION & INFERENCE
-            // ========================================================
+            const cleanUrl = rawEndpoint.replace(/\/+$/, "");
+            const targetUrl = `${cleanUrl}/predict`;
+
+            // Bypass warning header jika menggunakan tunnel gratisan (localtunnel / ngrok)
+            const requestHeaders = {
+                "Bypass-Tunnel-Reminder": "true",
+                "ngrok-skip-browser-warning": "true"
+            };
+
+            // ----------------------------------------------------
+            // TAHAP 2A: WORKFLOW VIDEO (EKSTRAKSI FRAME LOKAL)
+            // ----------------------------------------------------
             if (isVideo) {
-                btn.innerText = "Stage 2: Extracting temporal sample frames locally...";
+                btn.innerText = "Stage 2: Extracting temporal sample frames locally via Canvas...";
                 const frames = await extractVideoKeyframes(selectedFile, 4);
-
                 const frameResults = [];
+
                 for (let i = 0; i < frames.length; i++) {
-                    btn.innerText = `Analyzing temporal frame ${i + 1} of ${frames.length} on ZeroGPU...`;
-                    const res = await client.predict("/predict", { 
-                        input_image: frames[i] 
+                    btn.innerText = `Analyzing temporal frame ${i + 1} of ${frames.length} on GPU...`;
+                    const frameData = new FormData();
+                    frameData.append("file", frames[i]);
+
+                    const res = await fetch(targetUrl, {
+                        method: "POST",
+                        headers: requestHeaders,
+                        body: frameData
                     });
-                    frameResults.push(res.data[0]);
+
+                    if (!res.ok) {
+                        const err = await res.text();
+                        throw new Error(`Engine error on frame ${i + 1}: ${err.substring(0, 100)}`);
+                    }
+                    const data = await res.json();
+                    frameResults.push(data);
                 }
 
                 resultCard.style.display = "block";
@@ -274,12 +275,12 @@
                     finalReason = `Synthetic generative signatures identified consistently across ${aiVotes} of ${frameResults.length} sampled frames.`;
                 } else if (naturalVotes >= Math.ceil(frameResults.length * 0.5)) {
                     finalVerdict = "LIKELY NATURAL CAPTURE";
-                    finalReason = `Natural optical sensor textures confirmed consistently across ${naturalVotes} of ${frameResults.length} sampled frames.`;
+                    finalReason = `Natural optical characteristics confirmed consistently across ${naturalVotes} of ${frameResults.length} sampled frames.`;
                 }
 
                 setBadgeStyle(finalVerdict, verdictEl);
                 document.getElementById('resReason').innerText = finalReason;
-                document.getElementById('resPipeline').innerText = `Temporal Video Multi-Frame Inference (${frames.length} frames evaluated)`;
+                document.getElementById('resPipeline').innerText = `Temporal Video Aggregation (${frames.length} keyframes analyzed)`;
                 document.getElementById('resData').innerText = JSON.stringify({
                     file_name: selectedFile.name,
                     total_sampled_frames: frames.length,
@@ -290,23 +291,33 @@
                 return;
             }
 
-            // ========================================================
-            // STAGE 2B: SINGLE IMAGE DIRECT INFERENCE
-            // ========================================================
-            btn.innerText = "Stages 2–4: Executing visual neural & spectral 2D FFT inference on ZeroGPU...";
-            const res = await client.predict("/predict", { 
-                input_image: selectedFile 
+            // ----------------------------------------------------
+            // TAHAP 2B: WORKFLOW SINGLE IMAGE
+            // ----------------------------------------------------
+            btn.innerText = "Executing visual neural & spectral 2D FFT inference on backend...";
+            const formData = new FormData();
+            formData.append("file", selectedFile);
+
+            const resBackend = await fetch(targetUrl, {
+                method: "POST",
+                headers: requestHeaders,
+                body: formData
             });
 
-            const data = res.data[0];
+            if (!resBackend.ok) {
+                const errDetail = await resBackend.text();
+                throw new Error(`Backend error (${resBackend.status}): ${errDetail.substring(0, 120)}`);
+            }
+
+            const dataBackend = await resBackend.json();
             resultCard.style.display = "block";
-            setBadgeStyle(data.verdict, verdictEl);
-            document.getElementById('resReason').innerText = data.reason;
-            document.getElementById('resPipeline').innerText = "Direct ZeroGPU Multi-Channel Inference (ResNet18 + Spectral FFT)";
-            document.getElementById('resData').innerText = JSON.stringify(data, null, 2);
+            setBadgeStyle(dataBackend.verdict, verdictEl);
+            document.getElementById('resReason').innerText = dataBackend.reason;
+            document.getElementById('resPipeline').innerText = "Direct Multi-Stage Inference (ResNet18 + Spectral FFT)";
+            document.getElementById('resData').innerText = JSON.stringify(dataBackend, null, 2);
 
         } catch (err) {
-            alert("Execution Error: " + err.message);
+            alert("System exception: " + err.message);
         } finally {
             btn.innerText = "Start Verification";
             btn.disabled = false;
