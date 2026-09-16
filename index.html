@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SecurePixel - Multi-Stage Forensic Pipeline</title>
+    <title>SecurePixel - Multimodal Forensic Pipeline</title>
     <style>
         * { box-sizing: border-box; }
         body { 
@@ -91,17 +91,17 @@
 <body>
 
 <div class="card">
-    <h1>🛡️ SecurePixel Multi-Stage Pipeline</h1>
-    <p class="subtitle">Multi-Media Forensic Architecture: Local C2PA Inspection & Colab/Kaggle Neural Engine.</p>
+    <h1>🛡️ SecurePixel Multimodal Pipeline</h1>
+    <p class="subtitle">Media Forensics Suite: Image (ViT+FFT), Audio (Wav2Vec2+Acoustics), and Video Temporal Aggregation.</p>
 
     <div class="config-box">
-        <label for="engineUrl">Colab / Kaggle Tunnel Endpoint URL:</label>
-        <input type="text" id="engineUrl" placeholder="https://xxxx-xxxx.trycloudflare.com atau https://xxxx.loca.lt">
+        <label for="engineUrl">Kaggle / Colab Cloudflare Tunnel Endpoint URL:</label>
+        <input type="text" id="engineUrl" placeholder="https://xxxx-xxxx.trycloudflare.com">
     </div>
 
     <div class="upload-box" onclick="document.getElementById('fileInput').click()">
-        <span id="uploadLabel">📁 Click to select an image or video file</span>
-        <input type="file" id="fileInput" accept="image/*,video/*" onchange="handleFileSelected(event)">
+        <span id="uploadLabel">📁 Click to select an image, video, or audio file</span>
+        <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.mp3,.wav,.ogg,.m4a" onchange="handleFileSelected(event)">
     </div>
 
     <button type="button" id="btnSubmit" onclick="runPipeline()" disabled>Start Verification</button>
@@ -122,14 +122,16 @@
         if (e.target.files.length > 0) {
             selectedFile = e.target.files[0];
             const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(2);
-            const isVideo = selectedFile.type.startsWith("video/");
-            const icon = isVideo ? "🎥" : "🖼️";
+            let icon = "📁";
+            if (selectedFile.type.startsWith("video/")) icon = "🎥";
+            else if (selectedFile.type.startsWith("image/")) icon = "🖼️";
+            else if (selectedFile.type.startsWith("audio/") || /\.(mp3|wav|ogg|m4a)$/i.test(selectedFile.name)) icon = "🎙️";
+            
             document.getElementById('uploadLabel').innerText = `${icon} ${selectedFile.name} (${sizeMB} MB)`;
             document.getElementById('btnSubmit').disabled = false;
         }
     }
 
-    // Inspeksi biner cepat langsung di browser untuk C2PA
     async function checkClientC2PA(file) {
         const slice = file.slice(0, 131072);
         const buffer = await slice.arrayBuffer();
@@ -138,7 +140,6 @@
         return text.includes("c2pa") || text.includes("urn:c2pa") || text.includes("jumb");
     }
 
-    // Ekstraksi temporal frame video via HTML5 Canvas lokal
     async function extractVideoKeyframes(videoFile, maxFrames = 4) {
         return new Promise((resolve, reject) => {
             const video = document.createElement("video");
@@ -202,54 +203,54 @@
         resultCard.style.display = "none";
 
         const isVideo = selectedFile.type.startsWith("video/");
+        const isAudio = selectedFile.type.startsWith("audio/") || /\.(mp3|wav|ogg|m4a)$/i.test(selectedFile.name);
 
         try {
             // ----------------------------------------------------
-            // TAHAP 1: INSPEKSI C2PA LOKAL DI BROWSER (INSTAN)
+            // STAGE 1: LOCAL PROVENANCE (C2PA) CHECK (IMAGES/VIDEOS)
             // ----------------------------------------------------
-            btn.innerText = "Stage 1: Client inspection for C2PA provenance manifest...";
-            const hasC2PA = await checkClientC2PA(selectedFile);
-            if (hasC2PA) {
-                resultCard.style.display = "block";
-                setBadgeStyle("VERIFIED ORIGIN", verdictEl);
-                document.getElementById('resReason').innerText = "Valid C2PA Content Credentials provenance seal detected directly on the file header.";
-                document.getElementById('resPipeline').innerText = "Autonomous Client-Side Verification (Zero server inference required)";
-                document.getElementById('resData').innerText = JSON.stringify({
-                    file_name: selectedFile.name,
-                    media_type: selectedFile.type,
-                    has_c2pa: true,
-                    verdict: "VERIFIED ORIGIN"
-                }, null, 2);
-                return;
+            if (!isAudio) {
+                btn.innerText = "Stage 1: Scanning local file header for C2PA manifests...";
+                const hasC2PA = await checkClientC2PA(selectedFile);
+                if (hasC2PA) {
+                    resultCard.style.display = "block";
+                    setBadgeStyle("VERIFIED ORIGIN", verdictEl);
+                    document.getElementById('resReason').innerText = "Valid C2PA Content Credentials provenance seal detected directly on the file header.";
+                    document.getElementById('resPipeline').innerText = "Autonomous Client-Side Verification (Zero server inference required)";
+                    document.getElementById('resData').innerText = JSON.stringify({
+                        file_name: selectedFile.name,
+                        media_type: selectedFile.type,
+                        has_c2pa: true,
+                        verdict: "VERIFIED ORIGIN"
+                    }, null, 2);
+                    return;
+                }
             }
 
             if (!rawEndpoint) {
-                throw new Error("Colab / Kaggle Endpoint URL is required for deep neural inference.");
+                throw new Error("Colab / Kaggle Endpoint URL is required for neural inference.");
             }
 
             const cleanUrl = rawEndpoint.replace(/\/+$/, "");
-            const targetUrl = `${cleanUrl}/predict`;
-
-            // Bypass warning header jika menggunakan tunnel gratisan (localtunnel / ngrok)
             const requestHeaders = {
                 "Bypass-Tunnel-Reminder": "true",
                 "ngrok-skip-browser-warning": "true"
             };
 
             // ----------------------------------------------------
-            // TAHAP 2A: WORKFLOW VIDEO (EKSTRAKSI FRAME LOKAL)
+            // WORKFLOW A: VIDEO TEMPORAL AGGREGATION
             // ----------------------------------------------------
             if (isVideo) {
-                btn.innerText = "Stage 2: Extracting temporal sample frames locally via Canvas...";
+                btn.innerText = "Extracting video frames via local Canvas...";
                 const frames = await extractVideoKeyframes(selectedFile, 4);
                 const frameResults = [];
 
                 for (let i = 0; i < frames.length; i++) {
-                    btn.innerText = `Analyzing temporal frame ${i + 1} of ${frames.length} on GPU...`;
+                    btn.innerText = `Analyzing video frame ${i + 1} of ${frames.length}...`;
                     const frameData = new FormData();
                     frameData.append("file", frames[i]);
 
-                    const res = await fetch(targetUrl, {
+                    const res = await fetch(`${cleanUrl}/predict/image`, {
                         method: "POST",
                         headers: requestHeaders,
                         body: frameData
@@ -268,7 +269,7 @@
                 const naturalVotes = frameResults.filter(r => r.verdict === "LIKELY NATURAL CAPTURE").length;
 
                 let finalVerdict = "INCONCLUSIVE";
-                let finalReason = "Frame metrics yielded conflicting or degraded forensic signals across the video sequence.";
+                let finalReason = "Frame metrics yielded conflicting forensic signals across the video sequence.";
 
                 if (aiVotes >= Math.ceil(frameResults.length * 0.5)) {
                     finalVerdict = "LIKELY AI-GENERATED";
@@ -280,7 +281,7 @@
 
                 setBadgeStyle(finalVerdict, verdictEl);
                 document.getElementById('resReason').innerText = finalReason;
-                document.getElementById('resPipeline').innerText = `Temporal Video Aggregation (${frames.length} keyframes analyzed)`;
+                document.getElementById('resPipeline').innerText = `Temporal Video Aggregation (${frames.length} keyframes via ViT+FFT)`;
                 document.getElementById('resData').innerText = JSON.stringify({
                     file_name: selectedFile.name,
                     total_sampled_frames: frames.length,
@@ -292,13 +293,41 @@
             }
 
             // ----------------------------------------------------
-            // TAHAP 2B: WORKFLOW SINGLE IMAGE
+            // WORKFLOW B: AUDIO DEEPFAKE DETECTION
             // ----------------------------------------------------
-            btn.innerText = "Executing visual neural & spectral 2D FFT inference on backend...";
+            if (isAudio) {
+                btn.innerText = "Analyzing acoustic spectrum & phoneme features via Wav2Vec2...";
+                const formData = new FormData();
+                formData.append("file", selectedFile);
+
+                const res = await fetch(`${cleanUrl}/predict/audio`, {
+                    method: "POST",
+                    headers: requestHeaders,
+                    body: formData
+                });
+
+                if (!res.ok) {
+                    const err = await res.text();
+                    throw new Error(`Audio engine error (${res.status}): ${err.substring(0, 120)}`);
+                }
+
+                const data = await res.json();
+                resultCard.style.display = "block";
+                setBadgeStyle(data.verdict, verdictEl);
+                document.getElementById('resReason').innerText = data.reason;
+                document.getElementById('resPipeline').innerText = data.execution_route || "Acoustic Inference (Wav2Vec2 + Spectral Roll-off)";
+                document.getElementById('resData').innerText = JSON.stringify(data, null, 2);
+                return;
+            }
+
+            // ----------------------------------------------------
+            // WORKFLOW C: SINGLE IMAGE FORENSIC DETECTION
+            // ----------------------------------------------------
+            btn.innerText = "Executing visual neural & spectral 2D FFT inference...";
             const formData = new FormData();
             formData.append("file", selectedFile);
 
-            const resBackend = await fetch(targetUrl, {
+            const resBackend = await fetch(`${cleanUrl}/predict/image`, {
                 method: "POST",
                 headers: requestHeaders,
                 body: formData
@@ -313,7 +342,7 @@
             resultCard.style.display = "block";
             setBadgeStyle(dataBackend.verdict, verdictEl);
             document.getElementById('resReason').innerText = dataBackend.reason;
-            document.getElementById('resPipeline').innerText = "Direct Multi-Stage Inference (ResNet18 + Spectral FFT)";
+            document.getElementById('resPipeline').innerText = dataBackend.execution_route || "Direct Multi-Stage Inference (ViT-Base + Spectral FFT)";
             document.getElementById('resData').innerText = JSON.stringify(dataBackend, null, 2);
 
         } catch (err) {
