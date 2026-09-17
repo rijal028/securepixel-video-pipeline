@@ -43,7 +43,7 @@
             font-size: 13px; 
         }
         
-        /* Native Safe File Picker */
+        /* Native Safe File Picker Area */
         .file-select-area {
             background: #0f172a;
             border: 2px dashed #475569;
@@ -53,10 +53,11 @@
             margin-bottom: 15px;
         }
         .file-select-area input[type="file"] {
-            display: block;
+            display: inline-block;
             margin: 10px auto;
             color: #94a3b8;
             font-size: 13px;
+            cursor: pointer;
         }
         
         /* Media Preview Box */
@@ -76,6 +77,8 @@
             border: 1px solid #334155;
             margin-bottom: 8px;
             display: none;
+            margin-left: auto;
+            margin-right: auto;
         }
         #previewVideo {
             max-width: 100%;
@@ -84,6 +87,8 @@
             border: 1px solid #334155;
             margin-bottom: 8px;
             display: none;
+            margin-left: auto;
+            margin-right: auto;
         }
         #previewAudio {
             width: 100%;
@@ -196,10 +201,10 @@
         <input type="text" id="engineUrl" placeholder="https://xxxx-xxxx.trycloudflare.com">
     </div>
 
-    <!-- Native File Input: Tidak ada CSS tumpukan, tidak ada klik ganda -->
+    <!-- Direct Input Picker: Bebas dari konflik klik ganda/opacity bug -->
     <div class="file-select-area">
-        <label style="font-size: 13px; color: #cbd5e1; font-weight: bold; display: block;">Select File for Forensic Audit:</label>
-        <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.mp3,.wav,.ogg,.m4a">
+        <label style="font-size: 13px; color: #cbd5e1; font-weight: bold; display: block; margin-bottom: 8px;">Select File for Forensic Audit:</label>
+        <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.mp3,.wav,.ogg,.m4a" onchange="handleFileSelected(this)">
     </div>
 
     <!-- Preview Container -->
@@ -242,62 +247,71 @@
 </div>
 
 <script>
-    const SUPABASE_URL = "https://sihzvffweusqdsszgmcd.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpaHp2ZmZ3ZXVzcWRzc3pnbWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2MDczNzEsImV4cCI6MjEwNTE4MzM3MX0.xJ5vZa5HOW349_UJ7nVUfM97DHvcuYZLvxzqL6mIy4g";
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Supabase safe initializer
+    let supabase = null;
+    try {
+        if (window.supabase && window.supabase.createClient) {
+            supabase = window.supabase.createClient(
+                "https://sihzvffweusqdsszgmcd.supabase.co",
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpaHp2ZmZ3ZXVzcWRzc3pnbWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2MDczNzEsImV4cCI6MjEwNTE4MzM3MX0.xJ5vZa5HOW349_UJ7nVUfM97DHvcuYZLvxzqL6mIy4g"
+            );
+        }
+    } catch (e) {
+        console.warn("Supabase init deferred:", e);
+    }
 
     let selectedFile = null;
     let currentInferenceData = null;
     let currentObjectUrl = null;
 
-    const fileInput = document.getElementById('fileInput');
-    fileInput.addEventListener('change', function(e) {
-        if (!e.target.files || e.target.files.length === 0) {
-            return;
-        }
+    function handleFileSelected(inputElement) {
+        if (!inputElement.files || inputElement.files.length === 0) return;
 
-        selectedFile = e.target.files[0];
-        const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(2);
-        const fileType = selectedFile.type;
-        const fileName = selectedFile.name;
+        selectedFile = inputElement.files[0];
 
-        const pContainer = document.getElementById('previewContainer');
-        const pImg = document.getElementById('previewImage');
-        const pVid = document.getElementById('previewVideo');
-        const pAud = document.getElementById('previewAudio');
-        const pMeta = document.getElementById('previewMeta');
-
-        // Bersihkan URL lama jika ada
-        if (currentObjectUrl) {
-            URL.revokeObjectURL(currentObjectUrl);
-        }
-        currentObjectUrl = URL.createObjectURL(selectedFile);
-
-        // Reset display
-        pImg.style.display = "none";
-        pVid.style.display = "none";
-        pAud.style.display = "none";
-
-        if (fileType.startsWith("video/")) {
-            pVid.src = currentObjectUrl;
-            pVid.style.display = "block";
-        } else if (fileType.startsWith("audio/") || /\.(mp3|wav|ogg|m4a)$/i.test(fileName)) {
-            pAud.src = currentObjectUrl;
-            pAud.style.display = "block";
-        } else {
-            // Default image
-            pImg.src = currentObjectUrl;
-            pImg.style.display = "block";
-        }
-
-        pContainer.style.display = "block";
-        pMeta.innerText = `${fileName} • ${sizeMB} MB • ${fileType || 'binary format'}`;
-
-        // Aktifkan tombol Submit
+        // 1. Prioritas utama: langsung aktifkan tombol verifikasi
         const btn = document.getElementById('btnSubmit');
         btn.disabled = false;
         btn.innerText = "Start Verification";
-    });
+
+        // 2. Render preview secara aman
+        try {
+            const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(2);
+            const fileType = selectedFile.type;
+            const fileName = selectedFile.name;
+
+            const pContainer = document.getElementById('previewContainer');
+            const pImg = document.getElementById('previewImage');
+            const pVid = document.getElementById('previewVideo');
+            const pAud = document.getElementById('previewAudio');
+            const pMeta = document.getElementById('previewMeta');
+
+            if (currentObjectUrl) {
+                URL.revokeObjectURL(currentObjectUrl);
+            }
+            currentObjectUrl = URL.createObjectURL(selectedFile);
+
+            pImg.style.display = "none";
+            pVid.style.display = "none";
+            pAud.style.display = "none";
+
+            if (fileType.startsWith("video/")) {
+                pVid.src = currentObjectUrl;
+                pVid.style.display = "block";
+            } else if (fileType.startsWith("audio/") || /\.(mp3|wav|ogg|m4a)$/i.test(fileName)) {
+                pAud.src = currentObjectUrl;
+                pAud.style.display = "block";
+            } else {
+                pImg.src = currentObjectUrl;
+                pImg.style.display = "block";
+            }
+
+            pContainer.style.display = "block";
+            pMeta.innerText = `${fileName} • ${sizeMB} MB • ${fileType || 'binary format'}`;
+        } catch (err) {
+            console.error("Preview render non-fatal error:", err);
+        }
+    }
 
     async function computePerceptualHash(file) {
         if (!file.type.startsWith("image/")) {
@@ -397,6 +411,8 @@
         btn.innerText = "Dispatching Telemetry...";
 
         try {
+            if (!supabase) throw new Error("Supabase client connection not initialized.");
+
             const phash = await computePerceptualHash(selectedFile);
             const flagPayload = {
                 media_type: selectedFile.type.startsWith("audio/") ? "audio" : "image",
@@ -461,10 +477,9 @@
                     edgeResult = await edgeRes.json();
                 }
             } catch (e) {
-                console.warn("Edge gateway unreachable, falling back to direct inference.");
+                console.warn("Edge gateway unreachable, continuing to direct inference.");
             }
 
-            // Jika Vercel mengembalikan vonis STOP (C2PA terdeteksi / file rusak)
             if (edgeResult && edgeResult.status === "STOP") {
                 resultCard.style.display = "block";
                 setBadgeStyle(edgeResult.verdict, verdictEl);
