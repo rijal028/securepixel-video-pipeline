@@ -43,31 +43,20 @@
             font-size: 13px; 
         }
         
-        .upload-box { 
-            position: relative;
-            border: 2px dashed #475569; 
-            padding: 30px 20px; 
-            border-radius: 12px; 
-            text-align: center; 
-            cursor: pointer; 
-            background: #0f172a; 
-            margin-bottom: 15px; 
-            transition: border-color 0.2s, background 0.2s;
-            overflow: hidden;
+        /* Native Safe File Picker */
+        .file-select-area {
+            background: #0f172a;
+            border: 2px dashed #475569;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 15px;
         }
-        .upload-box:hover { 
-            border-color: #38bdf8; 
-            background: #131d35;
-        }
-        #fileInput { 
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            opacity: 0;
-            cursor: pointer;
-            z-index: 10;
+        .file-select-area input[type="file"] {
+            display: block;
+            margin: 10px auto;
+            color: #94a3b8;
+            font-size: 13px;
         }
         
         /* Media Preview Box */
@@ -82,22 +71,24 @@
         }
         #previewImage {
             max-width: 100%;
-            max-height: 320px;
+            max-height: 280px;
             border-radius: 6px;
             border: 1px solid #334155;
             margin-bottom: 8px;
-            object-fit: contain;
+            display: none;
         }
         #previewVideo {
             max-width: 100%;
-            max-height: 320px;
+            max-height: 280px;
             border-radius: 6px;
             border: 1px solid #334155;
             margin-bottom: 8px;
+            display: none;
         }
         #previewAudio {
             width: 100%;
             margin-top: 5px;
+            display: none;
         }
         #previewMeta {
             font-size: 12px;
@@ -106,7 +97,7 @@
             font-weight: 500;
         }
 
-        button { 
+        button.btn-primary { 
             background: #0284c7; 
             color: white; 
             border: none; 
@@ -118,8 +109,8 @@
             font-size: 15px; 
             transition: background 0.2s;
         }
-        button:hover { background: #0369a1; }
-        button:disabled { background: #475569; cursor: not-allowed; }
+        button.btn-primary:hover { background: #0369a1; }
+        button.btn-primary:disabled { background: #475569; cursor: not-allowed; }
         
         #resultCard { 
             display: none; 
@@ -162,7 +153,6 @@
             padding: 6px 12px;
             font-size: 12px;
             border-radius: 6px;
-            width: auto;
             cursor: pointer;
         }
         .btn-flag:hover { background: #450a0a; }
@@ -185,8 +175,12 @@
         .btn-submit-flag {
             background: #dc2626;
             color: white;
+            border: none;
             padding: 8px;
             font-size: 13px;
+            border-radius: 6px;
+            width: 100%;
+            cursor: pointer;
         }
         .btn-submit-flag:hover { background: #b91c1c; }
     </style>
@@ -202,21 +196,21 @@
         <input type="text" id="engineUrl" placeholder="https://xxxx-xxxx.trycloudflare.com">
     </div>
 
-    <!-- Upload Box -->
-    <div class="upload-box">
-        <span id="uploadLabel">📁 Click here to select an image, video, or audio file</span>
+    <!-- Native File Input: Tidak ada CSS tumpukan, tidak ada klik ganda -->
+    <div class="file-select-area">
+        <label style="font-size: 13px; color: #cbd5e1; font-weight: bold; display: block;">Select File for Forensic Audit:</label>
         <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.mp3,.wav,.ogg,.m4a">
     </div>
 
     <!-- Preview Container -->
     <div id="previewContainer">
-        <img id="previewImage" style="display:none;" alt="Preview image">
-        <video id="previewVideo" style="display:none;" controls></video>
-        <audio id="previewAudio" style="display:none;" controls></audio>
+        <img id="previewImage" alt="Preview">
+        <video id="previewVideo" controls></video>
+        <audio id="previewAudio" controls></audio>
         <div id="previewMeta"></div>
     </div>
 
-    <button type="button" id="btnSubmit" onclick="runPipeline()" disabled>Start Verification</button>
+    <button type="button" id="btnSubmit" class="btn-primary" onclick="runPipeline()" disabled>Start Verification</button>
 
     <div id="resultCard">
         <p><strong>Final Verdict:</strong> <span id="resVerdict" class="badge"></span></p>
@@ -254,16 +248,16 @@
 
     let selectedFile = null;
     let currentInferenceData = null;
+    let currentObjectUrl = null;
 
     const fileInput = document.getElementById('fileInput');
-    fileInput.addEventListener('change', handleFileSelected);
+    fileInput.addEventListener('change', function(e) {
+        if (!e.target.files || e.target.files.length === 0) {
+            return;
+        }
 
-    function handleFileSelected(e) {
-        if (!e.target.files || e.target.files.length === 0) return;
         selectedFile = e.target.files[0];
-        
         const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(2);
-        let icon = "📁";
         const fileType = selectedFile.type;
         const fileName = selectedFile.name;
 
@@ -273,34 +267,37 @@
         const pAud = document.getElementById('previewAudio');
         const pMeta = document.getElementById('previewMeta');
 
+        // Bersihkan URL lama jika ada
+        if (currentObjectUrl) {
+            URL.revokeObjectURL(currentObjectUrl);
+        }
+        currentObjectUrl = URL.createObjectURL(selectedFile);
+
         // Reset display
         pImg.style.display = "none";
         pVid.style.display = "none";
         pAud.style.display = "none";
 
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            if (fileType.startsWith("video/")) {
-                icon = "🎥";
-                pVid.src = event.target.result;
-                pVid.style.display = "block";
-            } else if (fileType.startsWith("image/")) {
-                icon = "🖼️";
-                pImg.src = event.target.result;
-                pImg.style.display = "block";
-            } else if (fileType.startsWith("audio/") || /\.(mp3|wav|ogg|m4a)$/i.test(fileName)) {
-                icon = "🎙️";
-                pAud.src = event.target.result;
-                pAud.style.display = "block";
-            }
-            pContainer.style.display = "block";
-        };
-        reader.readAsDataURL(selectedFile);
+        if (fileType.startsWith("video/")) {
+            pVid.src = currentObjectUrl;
+            pVid.style.display = "block";
+        } else if (fileType.startsWith("audio/") || /\.(mp3|wav|ogg|m4a)$/i.test(fileName)) {
+            pAud.src = currentObjectUrl;
+            pAud.style.display = "block";
+        } else {
+            // Default image
+            pImg.src = currentObjectUrl;
+            pImg.style.display = "block";
+        }
 
-        pMeta.innerText = `${fileName} (${sizeMB} MB)`;
-        document.getElementById('uploadLabel').innerText = `${icon} Selected: ${fileName}`;
-        document.getElementById('btnSubmit').disabled = false;
-    }
+        pContainer.style.display = "block";
+        pMeta.innerText = `${fileName} • ${sizeMB} MB • ${fileType || 'binary format'}`;
+
+        // Aktifkan tombol Submit
+        const btn = document.getElementById('btnSubmit');
+        btn.disabled = false;
+        btn.innerText = "Start Verification";
+    });
 
     async function computePerceptualHash(file) {
         if (!file.type.startsWith("image/")) {
@@ -464,10 +461,10 @@
                     edgeResult = await edgeRes.json();
                 }
             } catch (e) {
-                console.warn("Edge gateway unreachable, falling back to direct GPU inference.");
+                console.warn("Edge gateway unreachable, falling back to direct inference.");
             }
 
-            // Jika Vercel menghasilkan vonis final (STOP), langsung selesaikan tanpa buang waktu GPU
+            // Jika Vercel mengembalikan vonis STOP (C2PA terdeteksi / file rusak)
             if (edgeResult && edgeResult.status === "STOP") {
                 resultCard.style.display = "block";
                 setBadgeStyle(edgeResult.verdict, verdictEl);
