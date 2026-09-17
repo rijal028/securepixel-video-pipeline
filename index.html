@@ -201,7 +201,7 @@
         <input type="text" id="engineUrl" placeholder="https://xxxx-xxxx.trycloudflare.com">
     </div>
 
-    <!-- Direct Input Picker: Bebas dari konflik klik ganda/opacity bug -->
+    <!-- Direct Input Picker: Bebas konflik klik/opacity -->
     <div class="file-select-area">
         <label style="font-size: 13px; color: #cbd5e1; font-weight: bold; display: block; margin-bottom: 8px;">Select File for Forensic Audit:</label>
         <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.mp3,.wav,.ogg,.m4a" onchange="handleFileSelected(this)">
@@ -247,11 +247,11 @@
 </div>
 
 <script>
-    // Supabase safe initializer
-    let supabase = null;
+    // Supabase safe initializer (menggunakan sbClient agar tidak bentrok dengan window.supabase CDN)
+    let sbClient = null;
     try {
-        if (window.supabase && window.supabase.createClient) {
-            supabase = window.supabase.createClient(
+        if (window.supabase && typeof window.supabase.createClient === "function") {
+            sbClient = window.supabase.createClient(
                 "https://sihzvffweusqdsszgmcd.supabase.co",
                 "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpaHp2ZmZ3ZXVzcWRzc3pnbWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2MDczNzEsImV4cCI6MjEwNTE4MzM3MX0.xJ5vZa5HOW349_UJ7nVUfM97DHvcuYZLvxzqL6mIy4g"
             );
@@ -269,12 +269,12 @@
 
         selectedFile = inputElement.files[0];
 
-        // 1. Prioritas utama: langsung aktifkan tombol verifikasi
+        // 1. Langsung aktifkan tombol verifikasi
         const btn = document.getElementById('btnSubmit');
         btn.disabled = false;
         btn.innerText = "Start Verification";
 
-        // 2. Render preview secara aman
+        // 2. Render preview
         try {
             const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(2);
             const fileType = selectedFile.type;
@@ -411,7 +411,7 @@
         btn.innerText = "Dispatching Telemetry...";
 
         try {
-            if (!supabase) throw new Error("Supabase client connection not initialized.");
+            if (!sbClient) throw new Error("Supabase client connection not initialized.");
 
             const phash = await computePerceptualHash(selectedFile);
             const flagPayload = {
@@ -431,7 +431,7 @@
                 is_verified: false
             };
 
-            const { error } = await supabase.from('forensic_telemetry').insert([flagPayload]);
+            const { error } = await sbClient.from('forensic_telemetry').insert([flagPayload]);
             if (error) throw error;
 
             successEl.style.display = "block";
