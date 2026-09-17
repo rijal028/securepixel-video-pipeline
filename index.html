@@ -43,11 +43,10 @@
             font-size: 13px; 
         }
         
-        /* Interactive Upload Zone */
         .upload-box { 
             position: relative;
             border: 2px dashed #475569; 
-            padding: 35px 20px; 
+            padding: 30px 20px; 
             border-radius: 12px; 
             text-align: center; 
             cursor: pointer; 
@@ -75,20 +74,36 @@
         #previewContainer {
             display: none;
             margin-bottom: 20px;
-            text-align: center;
             background: #0b0f19;
             padding: 15px;
             border-radius: 8px;
             border: 1px solid #334155;
+            text-align: center;
         }
-        #previewImage, #previewVideo {
+        #previewImage {
             max-width: 100%;
-            max-height: 280px;
+            max-height: 320px;
             border-radius: 6px;
+            border: 1px solid #334155;
+            margin-bottom: 8px;
+            object-fit: contain;
+        }
+        #previewVideo {
+            max-width: 100%;
+            max-height: 320px;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            margin-bottom: 8px;
         }
         #previewAudio {
             width: 100%;
             margin-top: 5px;
+        }
+        #previewMeta {
+            font-size: 12px;
+            color: #38bdf8;
+            margin-top: 6px;
+            font-weight: 500;
         }
 
         button { 
@@ -105,6 +120,7 @@
         }
         button:hover { background: #0369a1; }
         button:disabled { background: #475569; cursor: not-allowed; }
+        
         #resultCard { 
             display: none; 
             margin-top: 25px; 
@@ -186,7 +202,7 @@
         <input type="text" id="engineUrl" placeholder="https://xxxx-xxxx.trycloudflare.com">
     </div>
 
-    <!-- Upload Box: Input file transparan bertumpuk di atas kotak -->
+    <!-- Upload Box -->
     <div class="upload-box">
         <span id="uploadLabel">📁 Click here to select an image, video, or audio file</span>
         <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.mp3,.wav,.ogg,.m4a">
@@ -194,10 +210,10 @@
 
     <!-- Preview Container -->
     <div id="previewContainer">
-        <img id="previewImage" style="display:none;" alt="Selected visual preview">
+        <img id="previewImage" style="display:none;" alt="Preview image">
         <video id="previewVideo" style="display:none;" controls></video>
         <audio id="previewAudio" style="display:none;" controls></audio>
-        <p id="previewMeta" style="font-size: 12px; color: #94a3b8; margin: 8px 0 0 0;"></p>
+        <div id="previewMeta"></div>
     </div>
 
     <button type="button" id="btnSubmit" onclick="runPipeline()" disabled>Start Verification</button>
@@ -257,76 +273,33 @@
         const pAud = document.getElementById('previewAudio');
         const pMeta = document.getElementById('previewMeta');
 
+        // Reset display
         pImg.style.display = "none";
         pVid.style.display = "none";
         pAud.style.display = "none";
 
-        const objectUrl = URL.createObjectURL(selectedFile);
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            if (fileType.startsWith("video/")) {
+                icon = "🎥";
+                pVid.src = event.target.result;
+                pVid.style.display = "block";
+            } else if (fileType.startsWith("image/")) {
+                icon = "🖼️";
+                pImg.src = event.target.result;
+                pImg.style.display = "block";
+            } else if (fileType.startsWith("audio/") || /\.(mp3|wav|ogg|m4a)$/i.test(fileName)) {
+                icon = "🎙️";
+                pAud.src = event.target.result;
+                pAud.style.display = "block";
+            }
+            pContainer.style.display = "block";
+        };
+        reader.readAsDataURL(selectedFile);
 
-        if (fileType.startsWith("video/")) {
-            icon = "🎥";
-            pVid.src = objectUrl;
-            pVid.style.display = "inline-block";
-        } else if (fileType.startsWith("image/")) {
-            icon = "🖼️";
-            pImg.src = objectUrl;
-            pImg.style.display = "inline-block";
-        } else if (fileType.startsWith("audio/") || /\.(mp3|wav|ogg|m4a)$/i.test(fileName)) {
-            icon = "🎙️";
-            pAud.src = objectUrl;
-            pAud.style.display = "inline-block";
-        }
-
-        pContainer.style.display = "block";
-        pMeta.innerText = `${fileName} • ${sizeMB} MB • ${fileType || 'binary media'}`;
+        pMeta.innerText = `${fileName} (${sizeMB} MB)`;
         document.getElementById('uploadLabel').innerText = `${icon} Selected: ${fileName}`;
         document.getElementById('btnSubmit').disabled = false;
-    }
-
-    async function inspectC2PAManifest(file) {
-        const slice = file.slice(0, 262144);
-        const buffer = await slice.arrayBuffer();
-        const bytes = new Uint8Array(buffer);
-        const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
-
-        const hasContainer = text.includes("c2pa") || text.includes("urn:c2pa") || text.includes("jumb");
-        if (!hasContainer) return { detected: false };
-
-        const lowerText = text.toLowerCase();
-        const isSynthetic = lowerText.includes("trainedalgorithmicmedia") ||
-                            lowerText.includes("generativesynthesis") ||
-                            lowerText.includes("c2pa.synthetic") ||
-                            lowerText.includes("synthid") ||
-                            (lowerText.includes("google") && lowerText.includes("gemini")) ||
-                            lowerText.includes("dall-e") ||
-                            lowerText.includes("midjourney");
-
-        if (isSynthetic) {
-            return {
-                detected: true,
-                isSyntheticClaim: true,
-                claimType: "Algorithmic / Synthetic Generation Manifest"
-            };
-        }
-
-        const isHardwareSigned = lowerText.includes("leica") ||
-                                 lowerText.includes("sony") ||
-                                 lowerText.includes("c2pa.hardware") ||
-                                 lowerText.includes("secure_camera");
-
-        if (isHardwareSigned) {
-            return {
-                detected: true,
-                isHardwareSigned: true,
-                claimType: "Cryptographic Hardware Sensor Signature"
-            };
-        }
-
-        return {
-            detected: true,
-            isAmbiguous: true,
-            claimType: "Software Edited or Generic Metadata Container"
-        };
     }
 
     async function computePerceptualHash(file) {
@@ -436,7 +409,7 @@
                 system_verdict: currentInferenceData.verdict,
                 system_confidence: parseFloat(currentInferenceData.confidence || currentInferenceData.calibrated_confidence || 0.0),
                 physical_metrics: {
-                    laplacian_variance: currentInferenceData.laplacian_variance || null,
+                    laplacian_variance: currentInferenceData.laplacian_variance || (currentInferenceData.metrics ? currentInferenceData.metrics.sharpness_score : null),
                     fft_phase_score: currentInferenceData.phase_score || null,
                     spectral_rolloff: currentInferenceData.spectral_rolloff || null,
                     zcr: currentInferenceData.zero_crossing_rate || null
@@ -474,46 +447,42 @@
         const isAudio = selectedFile.type.startsWith("audio/") || /\.(mp3|wav|ogg|m4a)$/i.test(selectedFile.name);
 
         try {
-            // STEP 1: C2PA MANIFEST CHECK (IMAGES & VIDEOS)
-            if (!isAudio) {
-                btn.innerText = "Auditing file headers for C2PA manifests...";
-                const c2paAnalysis = await inspectC2PAManifest(selectedFile);
-                
-                if (c2paAnalysis.detected) {
-                    if (c2paAnalysis.isSyntheticClaim) {
-                        resultCard.style.display = "block";
-                        setBadgeStyle("LIKELY AI-GENERATED", verdictEl);
-                        document.getElementById('resReason').innerText = "C2PA Provenance assertion explicitly tags file as algorithmic/synthetic media.";
-                        document.getElementById('resPipeline').innerText = "C2PA Assertion Extraction (Bypassed neural inference)";
-                        
-                        currentInferenceData = {
-                            verdict: "LIKELY AI-GENERATED",
-                            confidence: 1.0,
-                            reason: "Synthetic assertion detected: " + c2paAnalysis.claimType
-                        };
-                        document.getElementById('resData').innerText = JSON.stringify(currentInferenceData, null, 2);
-                        return;
-                    }
-                    
-                    if (c2paAnalysis.isHardwareSigned) {
-                        resultCard.style.display = "block";
-                        setBadgeStyle("VERIFIED ORIGIN", verdictEl);
-                        document.getElementById('resReason').innerText = "Authentic hardware-backed C2PA signature verified from physical sensor.";
-                        document.getElementById('resPipeline').innerText = "Hardware Cryptographic Root Verification";
-                        
-                        currentInferenceData = {
-                            verdict: "VERIFIED ORIGIN",
-                            confidence: 1.0,
-                            reason: c2paAnalysis.claimType
-                        };
-                        document.getElementById('resData').innerText = JSON.stringify(currentInferenceData, null, 2);
-                        return;
-                    }
+            // -----------------------------------------------------------------
+            // STAGE 1: VERCEL EDGE GATEWAY (/api/analyze)
+            // -----------------------------------------------------------------
+            btn.innerText = "Stage 1: Running edge physical guardrail & C2PA check...";
+            const edgeFormData = new FormData();
+            edgeFormData.append("file", selectedFile);
+
+            let edgeResult = null;
+            try {
+                const edgeRes = await fetch("/api/analyze", {
+                    method: "POST",
+                    body: edgeFormData
+                });
+                if (edgeRes.ok) {
+                    edgeResult = await edgeRes.json();
                 }
+            } catch (e) {
+                console.warn("Edge gateway unreachable, falling back to direct GPU inference.");
             }
 
+            // Jika Vercel menghasilkan vonis final (STOP), langsung selesaikan tanpa buang waktu GPU
+            if (edgeResult && edgeResult.status === "STOP") {
+                resultCard.style.display = "block";
+                setBadgeStyle(edgeResult.verdict, verdictEl);
+                document.getElementById('resReason').innerText = edgeResult.reason;
+                document.getElementById('resPipeline').innerText = "Vercel Edge Guardrail (C2PA / Physical Envelope)";
+                currentInferenceData = edgeResult;
+                document.getElementById('resData').innerText = JSON.stringify(edgeResult, null, 2);
+                return;
+            }
+
+            // -----------------------------------------------------------------
+            // STAGE 2: KAGGLE GPU INFERENCE VIA CLOUDFLARE
+            // -----------------------------------------------------------------
             if (!rawEndpoint) {
-                throw new Error("Colab / Kaggle Tunnel Endpoint URL is required for neural inference.");
+                throw new Error("Colab / Kaggle Tunnel Endpoint URL is required for deep neural inference.");
             }
 
             const cleanUrl = rawEndpoint.replace(/\/+$/, "");
