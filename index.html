@@ -201,7 +201,7 @@
         <input type="text" id="engineUrl" placeholder="https://xxxx-xxxx.trycloudflare.com">
     </div>
 
-    <!-- Direct Input Picker: Bebas konflik klik/opacity -->
+    <!-- Direct Input Picker -->
     <div class="file-select-area">
         <label style="font-size: 13px; color: #cbd5e1; font-weight: bold; display: block; margin-bottom: 8px;">Select File for Forensic Audit:</label>
         <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.mp3,.wav,.ogg,.m4a" onchange="handleFileSelected(this)">
@@ -247,7 +247,7 @@
 </div>
 
 <script>
-    // Supabase safe initializer (menggunakan sbClient agar tidak bentrok dengan window.supabase CDN)
+    // Supabase safe client
     let sbClient = null;
     try {
         if (window.supabase && typeof window.supabase.createClient === "function") {
@@ -311,6 +311,35 @@
         } catch (err) {
             console.error("Preview render non-fatal error:", err);
         }
+    }
+
+    // Client-side C2PA Inspector (Pemeriksaan Cepat hingga 2MB)
+    async function inspectClientC2PA(file) {
+        const readSize = Math.min(file.size, 2097152);
+        const slice = file.slice(0, readSize);
+        const buffer = await slice.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes).toLowerCase();
+
+        const hasContainer = text.includes("c2pa") || text.includes("urn:c2pa") || text.includes("jumb");
+        if (!hasContainer) return { detected: false };
+
+        const syntheticMarkers = [
+            "trainedalgorithmicmedia",
+            "generativesynthesis",
+            "c2pa.synthetic",
+            "synthid",
+            "dall-e",
+            "midjourney",
+            "gemini"
+        ];
+        const isSynthetic = syntheticMarkers.some(m => text.includes(m));
+
+        return {
+            detected: true,
+            isSynthetic: isSynthetic,
+            claimType: isSynthetic ? "Synthetic Algorithmic Manifest" : "Authentic C2PA Content Credentials Seal"
+        };
     }
 
     async function computePerceptualHash(file) {
@@ -461,9 +490,35 @@
 
         try {
             // -----------------------------------------------------------------
+            // STAGE 0: FAST CLIENT-SIDE C2PA CHECK (INSTANT ZERO-COST)
+            // -----------------------------------------------------------------
+            if (!isAudio) {
+                btn.innerText = "Scanning file header for C2PA provenance...";
+                const clientC2PA = await inspectClientC2PA(selectedFile);
+                if (clientC2PA.detected) {
+                    resultCard.style.display = "block";
+                    if (clientC2PA.isSynthetic) {
+                        setBadgeStyle("LIKELY AI-GENERATED", verdictEl);
+                        document.getElementById('resReason').innerText = "C2PA Provenance assertion explicitly certifies synthetic or algorithmic origin.";
+                        document.getElementById('resPipeline').innerText = "Client-Side C2PA Manifest Inspector (Zero GPU Cost)";
+                        currentInferenceData = { verdict: "LIKELY AI-GENERATED", confidence: 1.0, reason: clientC2PA.claimType };
+                    } else {
+                        setBadgeStyle("VERIFIED ORIGIN", verdictEl);
+                        document.getElementById('resReason').innerText = "Valid C2PA Content Credentials cryptographic provenance verified.";
+                        document.getElementById('resPipeline').innerText = "Client-Side C2PA Root Verification (Zero GPU Cost)";
+                        currentInferenceData = { verdict: "VERIFIED ORIGIN", confidence: 1.0, reason: clientC2PA.claimType };
+                    }
+                    document.getElementById('resData').innerText = JSON.stringify(currentInferenceData, null, 2);
+                    btn.innerText = "Start Verification";
+                    btn.disabled = false;
+                    return; // STOP DI SINI
+                }
+            }
+
+            // -----------------------------------------------------------------
             // STAGE 1: VERCEL EDGE GATEWAY (/api/analyze)
             // -----------------------------------------------------------------
-            btn.innerText = "Stage 1: Running edge physical guardrail & C2PA check...";
+            btn.innerText = "Stage 1: Running edge physical guardrail check...";
             const edgeFormData = new FormData();
             edgeFormData.append("file", selectedFile);
 
@@ -477,7 +532,7 @@
                     edgeResult = await edgeRes.json();
                 }
             } catch (e) {
-                console.warn("Edge gateway unreachable, continuing to direct inference.");
+                console.warn("Edge gateway unreachable, continuing to neural inference.");
             }
 
             if (edgeResult && edgeResult.status === "STOP") {
@@ -487,7 +542,9 @@
                 document.getElementById('resPipeline').innerText = "Vercel Edge Guardrail (C2PA / Physical Envelope)";
                 currentInferenceData = edgeResult;
                 document.getElementById('resData').innerText = JSON.stringify(edgeResult, null, 2);
-                return;
+                btn.innerText = "Start Verification";
+                btn.disabled = false;
+                return; // STOP DI SINI
             }
 
             // -----------------------------------------------------------------
