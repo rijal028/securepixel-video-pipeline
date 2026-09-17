@@ -49,11 +49,32 @@
             text-align: center; 
             cursor: pointer; 
             background: #0f172a; 
-            margin-bottom: 20px; 
+            margin-bottom: 15px; 
             transition: border-color 0.2s;
         }
         .upload-box:hover { border-color: #38bdf8; }
         input[type="file"] { display: none; }
+        
+        /* Media Preview Box */
+        #previewContainer {
+            display: none;
+            margin-bottom: 20px;
+            text-align: center;
+            background: #0b0f19;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        #previewImage, #previewVideo {
+            max-width: 100%;
+            max-height: 280px;
+            border-radius: 6px;
+        }
+        #previewAudio {
+            width: 100%;
+            margin-top: 5px;
+        }
+
         button { 
             background: #0284c7; 
             color: white; 
@@ -89,7 +110,7 @@
             border: 1px solid #1e293b; 
         }
 
-        /* Redress and Reporting UI */
+        /* Redress Section */
         .flag-container {
             margin-top: 20px;
             background: #0f172a;
@@ -149,9 +170,18 @@
         <input type="text" id="engineUrl" placeholder="https://xxxx-xxxx.trycloudflare.com">
     </div>
 
-    <div class="upload-box" onclick="document.getElementById('fileInput').click()">
-        <span id="uploadLabel">📁 Click to select an image, video, or audio file</span>
-        <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.mp3,.wav,.ogg,.m4a" onchange="handleFileSelected(event)">
+    <!-- Upload Box -->
+    <div class="upload-box" id="dropArea">
+        <span id="uploadLabel">📁 Click here to select an image, video, or audio file</span>
+    </div>
+    <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.mp3,.wav,.ogg,.m4a">
+
+    <!-- Preview Container -->
+    <div id="previewContainer">
+        <img id="previewImage" style="display:none;" alt="Preview">
+        <video id="previewVideo" style="display:none;" controls></video>
+        <audio id="previewAudio" style="display:none;" controls></audio>
+        <p id="previewMeta" style="font-size: 11px; color: #94a3b8; margin: 6px 0 0 0;"></p>
     </div>
 
     <button type="button" id="btnSubmit" onclick="runPipeline()" disabled>Start Verification</button>
@@ -186,9 +216,6 @@
 </div>
 
 <script>
-    // ----------------------------------------------------
-    // INITIALIZATION & SUPABASE CONFIGURATION
-    // ----------------------------------------------------
     const SUPABASE_URL = "https://sihzvffweusqdsszgmcd.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpaHp2ZmZ3ZXVzcWRzc3pnbWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2MDczNzEsImV4cCI6MjEwNTE4MzM3MX0.xJ5vZa5HOW349_UJ7nVUfM97DHvcuYZLvxzqL6mIy4g";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -196,42 +223,68 @@
     let selectedFile = null;
     let currentInferenceData = null;
 
+    const dropArea = document.getElementById('dropArea');
+    const fileInput = document.getElementById('fileInput');
+
+    dropArea.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', handleFileSelected);
+
     function handleFileSelected(e) {
-        if (e.target.files.length > 0) {
-            selectedFile = e.target.files[0];
-            const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(2);
-            let icon = "📁";
-            if (selectedFile.type.startsWith("video/")) icon = "🎥";
-            else if (selectedFile.type.startsWith("image/")) icon = "🖼️";
-            else if (selectedFile.type.startsWith("audio/") || /\.(mp3|wav|ogg|m4a)$/i.test(selectedFile.name)) icon = "🎙️";
-            
-            document.getElementById('uploadLabel').innerText = `${icon} ${selectedFile.name} (${sizeMB} MB)`;
-            document.getElementById('btnSubmit').disabled = false;
+        if (!e.target.files || e.target.files.length === 0) return;
+        selectedFile = e.target.files[0];
+        
+        const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(2);
+        let icon = "📁";
+        const fileType = selectedFile.type;
+        const fileName = selectedFile.name;
+
+        const pContainer = document.getElementById('previewContainer');
+        const pImg = document.getElementById('previewImage');
+        const pVid = document.getElementById('previewVideo');
+        const pAud = document.getElementById('previewAudio');
+        const pMeta = document.getElementById('previewMeta');
+
+        pImg.style.display = "none";
+        pVid.style.display = "none";
+        pAud.style.display = "none";
+
+        const objectUrl = URL.createObjectURL(selectedFile);
+
+        if (fileType.startsWith("video/")) {
+            icon = "🎥";
+            pVid.src = objectUrl;
+            pVid.style.display = "inline-block";
+        } else if (fileType.startsWith("image/")) {
+            icon = "🖼️";
+            pImg.src = objectUrl;
+            pImg.style.display = "inline-block";
+        } else if (fileType.startsWith("audio/") || /\.(mp3|wav|ogg|m4a)$/i.test(fileName)) {
+            icon = "🎙️";
+            pAud.src = objectUrl;
+            pAud.style.display = "inline-block";
         }
+
+        pContainer.style.display = "block";
+        pMeta.innerText = `${fileName} • ${sizeMB} MB • ${fileType || 'binary stream'}`;
+        document.getElementById('uploadLabel').innerText = `${icon} Selected: ${fileName}`;
+        document.getElementById('btnSubmit').disabled = false;
     }
 
-    // ----------------------------------------------------
-    // STAGE 1: HARDENED C2PA MANIFEST INSPECTOR (GEMINI-SAFE)
-    // ----------------------------------------------------
     async function inspectC2PAManifest(file) {
-        // Read header slice where JUMBF boxes reside
         const slice = file.slice(0, 262144);
         const buffer = await slice.arrayBuffer();
         const bytes = new Uint8Array(buffer);
         const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
 
         const hasContainer = text.includes("c2pa") || text.includes("urn:c2pa") || text.includes("jumb");
-        if (!hasContainer) {
-            return { detected: false };
-        }
+        if (!hasContainer) return { detected: false };
 
-        // Detect known algorithmic assertions
         const lowerText = text.toLowerCase();
         const isSynthetic = lowerText.includes("trainedalgorithmicmedia") ||
                             lowerText.includes("generativesynthesis") ||
                             lowerText.includes("c2pa.synthetic") ||
                             lowerText.includes("synthid") ||
-                            lowerText.includes("google") && lowerText.includes("gemini") ||
+                            (lowerText.includes("google") && lowerText.includes("gemini")) ||
                             lowerText.includes("dall-e") ||
                             lowerText.includes("midjourney");
 
@@ -243,7 +296,6 @@
             };
         }
 
-        // Detect verified camera hardware roots
         const isHardwareSigned = lowerText.includes("leica") ||
                                  lowerText.includes("sony") ||
                                  lowerText.includes("c2pa.hardware") ||
@@ -257,7 +309,6 @@
             };
         }
 
-        // Generic C2PA container detected without explicit hardware guarantee
         return {
             detected: true,
             isAmbiguous: true,
@@ -265,12 +316,9 @@
         };
     }
 
-    // ----------------------------------------------------
-    // PERCEPTUAL HASH (pHash) COMPUTATION (CLIENT-SIDE)
-    // ----------------------------------------------------
     async function computePerceptualHash(file) {
         if (!file.type.startsWith("image/")) {
-            return "audio_or_video_stream_" + file.size;
+            return "stream_metric_" + file.size;
         }
         return new Promise((resolve) => {
             const img = new Image();
@@ -298,7 +346,7 @@
                 URL.revokeObjectURL(img.src);
                 resolve(parseInt(hash, 2).toString(16).padStart(16, "0"));
             };
-            img.onerror = () => resolve("hash_computation_failed");
+            img.onerror = () => resolve("phash_fallback_" + Date.now());
         });
     }
 
@@ -312,7 +360,7 @@
 
             video.onerror = () => {
                 URL.revokeObjectURL(video.src);
-                reject(new Error("Browser hardware decoder failed to read video format."));
+                reject(new Error("Decoder failed to extract frames from video."));
             };
 
             video.onloadedmetadata = async () => {
@@ -358,9 +406,6 @@
         form.style.display = form.style.display === "block" ? "none" : "block";
     }
 
-    // ----------------------------------------------------
-    // STAGE 2: PRIVACY-SAFE TELEMETRY SUBMISSION
-    // ----------------------------------------------------
     async function submitTelemetryFlag() {
         if (!currentInferenceData) return;
         const btn = document.getElementById('btnSendFlag');
@@ -376,14 +421,14 @@
                 reported_error: document.getElementById('flagType').value,
                 user_notes: document.getElementById('flagNotes').value.trim(),
                 system_verdict: currentInferenceData.verdict,
-                system_confidence: parseFloat(currentInferenceData.confidence || currentInferenceData.ai_probability || 0.0),
+                system_confidence: parseFloat(currentInferenceData.confidence || currentInferenceData.calibrated_confidence || 0.0),
                 physical_metrics: {
                     laplacian_variance: currentInferenceData.laplacian_variance || null,
                     fft_phase_score: currentInferenceData.phase_score || null,
                     spectral_rolloff: currentInferenceData.spectral_rolloff || null,
                     zcr: currentInferenceData.zero_crossing_rate || null
                 },
-                model_logits: currentInferenceData.logits || currentInferenceData.raw_scores || {},
+                model_logits: currentInferenceData.raw_scores || currentInferenceData.metrics || {},
                 is_verified: false
             };
 
@@ -399,9 +444,6 @@
         }
     }
 
-    // ----------------------------------------------------
-    // MAIN VERIFICATION PIPELINE
-    // ----------------------------------------------------
     async function runPipeline() {
         if (!selectedFile) return;
 
@@ -419,15 +461,12 @@
         const isAudio = selectedFile.type.startsWith("audio/") || /\.(mp3|wav|ogg|m4a)$/i.test(selectedFile.name);
 
         try {
-            // ----------------------------------------------------
-            // STEP 1: C2PA MANIFEST AUDIT (IMAGES / VIDEOS)
-            // ----------------------------------------------------
+            // STEP 1: C2PA MANIFEST CHECK (IMAGES & VIDEOS)
             if (!isAudio) {
                 btn.innerText = "Auditing file headers for C2PA manifests...";
                 const c2paAnalysis = await inspectC2PAManifest(selectedFile);
                 
                 if (c2paAnalysis.detected) {
-                    // Check if generated by synthetic tools (e.g. Gemini, DALL-E)
                     if (c2paAnalysis.isSyntheticClaim) {
                         resultCard.style.display = "block";
                         setBadgeStyle("LIKELY AI-GENERATED", verdictEl);
@@ -443,7 +482,6 @@
                         return;
                     }
                     
-                    // Check if signed by verified camera hardware
                     if (c2paAnalysis.isHardwareSigned) {
                         resultCard.style.display = "block";
                         setBadgeStyle("VERIFIED ORIGIN", verdictEl);
@@ -458,8 +496,6 @@
                         document.getElementById('resData').innerText = JSON.stringify(currentInferenceData, null, 2);
                         return;
                     }
-
-                    // Ambiguous or software edit manifest -> Forward to neural pipeline
                 }
             }
 
@@ -473,11 +509,9 @@
                 "ngrok-skip-browser-warning": "true"
             };
 
-            // ----------------------------------------------------
-            // WORKFLOW A: VIDEO TEMPORAL AGGREGATION
-            // ----------------------------------------------------
+            // WORKFLOW A: VIDEO AGGREGATION
             if (isVideo) {
-                btn.innerText = "Extracting video frames via local Canvas...";
+                btn.innerText = "Extracting video frames via Canvas...";
                 const frames = await extractVideoKeyframes(selectedFile, 4);
                 const frameResults = [];
 
@@ -509,10 +543,10 @@
 
                 if (aiVotes >= Math.ceil(frameResults.length * 0.5)) {
                     finalVerdict = "LIKELY AI-GENERATED";
-                    finalReason = `Synthetic generative signatures identified consistently across ${aiVotes} of ${frameResults.length} sampled frames.`;
+                    finalReason = `Synthetic generative signatures identified across ${aiVotes} of ${frameResults.length} sampled frames.`;
                 } else if (naturalVotes >= Math.ceil(frameResults.length * 0.5)) {
                     finalVerdict = "LIKELY NATURAL CAPTURE";
-                    finalReason = `Natural optical characteristics confirmed consistently across ${naturalVotes} of ${frameResults.length} sampled frames.`;
+                    finalReason = `Natural optical characteristics confirmed across ${naturalVotes} of ${frameResults.length} sampled frames.`;
                 }
 
                 setBadgeStyle(finalVerdict, verdictEl);
@@ -531,11 +565,9 @@
                 return;
             }
 
-            // ----------------------------------------------------
-            // WORKFLOW B: AUDIO DEEPFAKE DETECTION
-            // ----------------------------------------------------
+            // WORKFLOW B: AUDIO DETECTION
             if (isAudio) {
-                btn.innerText = "Analyzing acoustic spectrum & phoneme features via Wav2Vec2...";
+                btn.innerText = "Analyzing acoustic spectrum via Wav2Vec2...";
                 const formData = new FormData();
                 formData.append("file", selectedFile);
 
@@ -561,10 +593,8 @@
                 return;
             }
 
-            // ----------------------------------------------------
-            // WORKFLOW C: SINGLE IMAGE FORENSIC DETECTION
-            // ----------------------------------------------------
-            btn.innerText = "Executing visual neural & spectral 2D FFT inference...";
+            // WORKFLOW C: SINGLE IMAGE
+            btn.innerText = "Executing visual ViT-Base + Spectral 2D FFT inference...";
             const formData = new FormData();
             formData.append("file", selectedFile);
 
