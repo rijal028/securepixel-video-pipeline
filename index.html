@@ -25,23 +25,6 @@
         }
         h1 { margin-top: 0; font-size: 22px; color: #38bdf8; }
         p.subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
-        .config-box { 
-            margin-bottom: 20px; 
-            background: #0f172a; 
-            padding: 12px; 
-            border-radius: 8px; 
-            border: 1px solid #334155; 
-        }
-        .config-box label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 6px; font-weight: 600; }
-        .config-box input { 
-            width: 100%; 
-            background: #1e293b; 
-            border: 1px solid #475569; 
-            color: #f8fafc; 
-            padding: 10px; 
-            border-radius: 6px; 
-            font-size: 13px; 
-        }
         
         /* Native Safe File Picker Area */
         .file-select-area {
@@ -196,11 +179,6 @@
     <h1>🛡️ SecurePixel Multimodal Pipeline</h1>
     <p class="subtitle">Autonomous Provenance (C2PA) & Deepfake Forensics: Image (ViT+FFT), Audio (Wav2Vec2), Video Aggregation.</p>
 
-    <div class="config-box">
-        <label for="engineUrl">Kaggle / Colab Cloudflare Tunnel Endpoint URL:</label>
-        <input type="text" id="engineUrl" placeholder="https://xxxx-xxxx.trycloudflare.com">
-    </div>
-
     <!-- Direct Input Picker -->
     <div class="file-select-area">
         <label style="font-size: 13px; color: #cbd5e1; font-weight: bold; display: block; margin-bottom: 8px;">Select File for Forensic Audit:</label>
@@ -247,6 +225,12 @@
 </div>
 
 <script>
+    // =========================================================================
+    // TEMPEL LINK CLOUDFLARE TUNNEL KAMU LANGSUNG DI SINI:
+    // =========================================================================
+    const DEFAULT_BACKEND_URL = "https://drinking-usual-positive-conversations.trycloudflare.com";
+    // =========================================================================
+
     // Supabase safe client
     let sbClient = null;
     try {
@@ -478,7 +462,7 @@
         const btn = document.getElementById('btnSubmit');
         const resultCard = document.getElementById('resultCard');
         const verdictEl = document.getElementById('resVerdict');
-        const rawEndpoint = document.getElementById('engineUrl').value.trim();
+        const rawEndpoint = DEFAULT_BACKEND_URL ? DEFAULT_BACKEND_URL.trim() : "";
 
         btn.disabled = true;
         resultCard.style.display = "none";
@@ -511,7 +495,7 @@
                     document.getElementById('resData').innerText = JSON.stringify(currentInferenceData, null, 2);
                     btn.innerText = "Start Verification";
                     btn.disabled = false;
-                    return; // STOP DI SINI
+                    return;
                 }
             }
 
@@ -544,14 +528,14 @@
                 document.getElementById('resData').innerText = JSON.stringify(edgeResult, null, 2);
                 btn.innerText = "Start Verification";
                 btn.disabled = false;
-                return; // STOP DI SINI
+                return;
             }
 
             // -----------------------------------------------------------------
             // STAGE 2: KAGGLE GPU INFERENCE VIA CLOUDFLARE
             // -----------------------------------------------------------------
-            if (!rawEndpoint) {
-                throw new Error("Colab / Kaggle Tunnel Endpoint URL is required for deep neural inference.");
+            if (!rawEndpoint || rawEndpoint.includes("xxxx-xxxx")) {
+                throw new Error("Silakan masukkan URL tunnel Cloudflare yang valid pada variabel DEFAULT_BACKEND_URL di dalam kode JavaScript.");
             }
 
             const cleanUrl = rawEndpoint.replace(/\/+$/, "");
