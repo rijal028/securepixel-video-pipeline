@@ -177,7 +177,7 @@
 
 <div class="card">
     <h1>🛡️ SecurePixel Multimodal Pipeline</h1>
-    <p class="subtitle">Autonomous Provenance (C2PA) & Deepfake Forensics: Image (ViT+FFT), Audio (Wav2Vec2), Video Aggregation.</p>
+    <p class="subtitle">Autonomous Provenance (C2PA) & Deepfake Forensics: Visual (Dual ConvNeXt V2), Audio (Wav2Vec2), Video Aggregation.</p>
 
     <!-- Direct Input Picker -->
     <div class="file-select-area">
@@ -226,7 +226,7 @@
 
 <script>
     // =========================================================================
-    // TEMPEL LINK CLOUDFLARE TUNNEL KAMU LANGSUNG DI SINI:
+    // URL CLOUDFLARE TUNNEL (PASTIKAN CELL PYTHON MASIH BERJALAN)
     // =========================================================================
     const DEFAULT_BACKEND_URL = "https://bid-tab-comparable-electro.trycloudflare.com";
     // =========================================================================
@@ -500,14 +500,14 @@
             }
 
             // -----------------------------------------------------------------
-            // STAGE 1: VERCEL EDGE GATEWAY (/api/analyze)
+            // STAGE 1: VERCEL EDGE GATEWAY (/api/analyze) (SAFE BYPASS JIKA LOKAL)
             // -----------------------------------------------------------------
-            btn.innerText = "Stage 1: Running edge physical guardrail check...";
-            const edgeFormData = new FormData();
-            edgeFormData.append("file", selectedFile);
-
+            btn.innerText = "Checking physical envelope guardrail...";
             let edgeResult = null;
             try {
+                const edgeFormData = new FormData();
+                edgeFormData.append("file", selectedFile);
+
                 const edgeRes = await fetch("/api/analyze", {
                     method: "POST",
                     body: edgeFormData
@@ -516,7 +516,7 @@
                     edgeResult = await edgeRes.json();
                 }
             } catch (e) {
-                console.warn("Edge gateway unreachable, continuing to neural inference.");
+                console.warn("Edge gateway endpoint unreachable, continuing to neural inference.");
             }
 
             if (edgeResult && edgeResult.status === "STOP") {
@@ -532,17 +532,13 @@
             }
 
             // -----------------------------------------------------------------
-            // STAGE 2: KAGGLE GPU INFERENCE VIA CLOUDFLARE
+            // STAGE 2: BACKEND INFERENCE VIA CLOUDFLARE
             // -----------------------------------------------------------------
             if (!rawEndpoint || rawEndpoint.includes("xxxx-xxxx")) {
                 throw new Error("Silakan masukkan URL tunnel Cloudflare yang valid pada variabel DEFAULT_BACKEND_URL di dalam kode JavaScript.");
             }
 
             const cleanUrl = rawEndpoint.replace(/\/+$/, "");
-            const requestHeaders = {
-                "Bypass-Tunnel-Reminder": "true",
-                "ngrok-skip-browser-warning": "true"
-            };
 
             // WORKFLOW A: VIDEO AGGREGATION
             if (isVideo) {
@@ -555,15 +551,15 @@
                     const frameData = new FormData();
                     frameData.append("file", frames[i]);
 
+                    // Hapus custom header pemicu CORS preflight
                     const res = await fetch(`${cleanUrl}/predict/image`, {
                         method: "POST",
-                        headers: requestHeaders,
                         body: frameData
                     });
 
                     if (!res.ok) {
                         const err = await res.text();
-                        throw new Error(`Engine error on frame ${i + 1}: ${err.substring(0, 100)}`);
+                        throw new Error(`Engine error on frame ${i + 1} (Status ${res.status}): ${err.substring(0, 100)}`);
                     }
                     const data = await res.json();
                     frameResults.push(data);
@@ -586,7 +582,7 @@
 
                 setBadgeStyle(finalVerdict, verdictEl);
                 document.getElementById('resReason').innerText = finalReason;
-                document.getElementById('resPipeline').innerText = `Temporal Video Aggregation (${frames.length} keyframes via ViT+FFT)`;
+                document.getElementById('resPipeline').innerText = `Temporal Video Aggregation (${frames.length} keyframes via Dual ConvNeXt V2)`;
                 
                 currentInferenceData = {
                     verdict: finalVerdict,
@@ -608,7 +604,6 @@
 
                 const res = await fetch(`${cleanUrl}/predict/audio`, {
                     method: "POST",
-                    headers: requestHeaders,
                     body: formData
                 });
 
@@ -629,13 +624,13 @@
             }
 
             // WORKFLOW C: SINGLE IMAGE
-            btn.innerText = "Executing visual ViT-Base + Spectral 2D FFT inference...";
+            btn.innerText = "Executing visual Dual ConvNeXt V2 + Spectral 2D FFT inference...";
             const formData = new FormData();
             formData.append("file", selectedFile);
 
+            // Fetch POST murni tanpa custom preflight headers
             const resBackend = await fetch(`${cleanUrl}/predict/image`, {
                 method: "POST",
-                headers: requestHeaders,
                 body: formData
             });
 
@@ -648,12 +643,13 @@
             resultCard.style.display = "block";
             setBadgeStyle(dataBackend.verdict, verdictEl);
             document.getElementById('resReason').innerText = dataBackend.reason;
-            document.getElementById('resPipeline').innerText = dataBackend.execution_route || "Direct Multi-Stage Inference (ViT-Base + Spectral FFT)";
+            document.getElementById('resPipeline').innerText = dataBackend.execution_route || "Dual ConvNeXt V2 Dynamic + Hierarchical Arbitration";
             
             currentInferenceData = dataBackend;
             document.getElementById('resData').innerText = JSON.stringify(dataBackend, null, 2);
 
         } catch (err) {
+            console.error("Forensic execution fault:", err);
             alert("System exception: " + err.message);
         } finally {
             btn.innerText = "Start Verification";
