@@ -108,7 +108,7 @@
             display: inline-block;
             padding: 8px 18px;
             border-radius: 8px;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 800;
             letter-spacing: 0.5px;
             margin-bottom: 10px;
@@ -148,8 +148,8 @@
             letter-spacing: 0.5px;
         }
         .split-card .stamp-badge {
-            font-size: 13px;
-            padding: 6px 12px;
+            font-size: 12px;
+            padding: 6px 10px;
         }
 
         /* Redress Section */
@@ -276,9 +276,9 @@
 
 <script>
     // =========================================================================
-    // CLOUDFLARE TUNNEL URL (Sinkronkan dengan output Kaggle)
+    // CLOUDFLARE TUNNEL URL (Sinkronkan dengan output cell Kaggle yang aktif)
     // =========================================================================
-    const DEFAULT_BACKEND_URL = "https://loaded-prime-moment-passengers.trycloudflare.com";
+    const DEFAULT_BACKEND_URL = "https://electronic-killing-van-hobby.trycloudflare.com";
     // =========================================================================
 
     let sbClient = null;
@@ -364,7 +364,7 @@
         };
     }
 
-    // Perceptual hash untuk feedback aman (tanpa simpan foto)
+    // Perceptual hash untuk feedback aman (tanpa simpan media mentah)
     async function computePerceptualHash(file) {
         if (!file.type.startsWith("image/")) {
             return "stream_id_" + file.size;
@@ -498,28 +498,28 @@
         return buffer;
     }
 
-    // Terapkan 4 Stempel Resmi
+    // Terapkan Stempel Resmi Sesuai Dokumen Benchmark
     function applyVerdictStamp(verdict, badgeEl, descEl, customDesc) {
-        if (verdict === "GENERATE" || verdict === "LIKELY AI-GENERATED") {
+        if (verdict === "LIKELY AI-GENERATED") {
             badgeEl.className = "stamp-badge stamp-generate";
-            badgeEl.innerText = "🤖 AI-GENERATED";
+            badgeEl.innerText = "🤖 LIKELY AI-GENERATED";
             descEl.innerText = customDesc || "Synthetic latent generative traits identified.";
-        } else if (verdict === "NATURAL" || verdict === "LIKELY NATURAL CAPTURE") {
+        } else if (verdict === "LIKELY NATURAL CAPTURE") {
             badgeEl.className = "stamp-badge stamp-natural";
-            badgeEl.innerText = "📷 AUTHENTIC CAMERA";
-            descEl.innerText = customDesc || "Physical optical sensor traits verified.";
-        } else if (verdict === "ORIGIN" || verdict === "VERIFIED ORIGIN") {
+            badgeEl.innerText = "📷 LIKELY NATURAL CAPTURE";
+            descEl.innerText = customDesc || "Physical camera sensor optical noise confirmed.";
+        } else if (verdict === "VERIFIED ORIGIN") {
             badgeEl.className = "stamp-badge stamp-origin";
-            badgeEl.innerText = "🛡️ VERIFIED SOURCE";
+            badgeEl.innerText = "🛡️ VERIFIED ORIGIN";
             descEl.innerText = customDesc || "Valid cryptographic provenance seal confirmed.";
-        } else if (verdict === "NO_AUDIO") {
+        } else if (verdict === "NO_AUDIO_STREAM" || verdict === "NO_AUDIO") {
             badgeEl.className = "stamp-badge stamp-neutral";
             badgeEl.innerText = "NO AUDIO TRACK";
             descEl.innerText = "No audio stream detected.";
         } else {
             badgeEl.className = "stamp-badge stamp-inconclusive";
             badgeEl.innerText = "⚠️ INCONCLUSIVE";
-            descEl.innerText = customDesc || "Ambiguous signals; system safely abstained.";
+            descEl.innerText = customDesc || "Ambiguous forensic signals; system safely abstained.";
         }
     }
 
@@ -589,11 +589,11 @@
                 if (c2pa.detected) {
                     resultCard.style.display = "block";
                     if (c2pa.isSynthetic) {
-                        applyVerdictStamp("GENERATE", badgeEl, descEl, "Synthetic credentials detected in file header.");
-                        lastVerdictResult = { verdict: "GENERATE" };
+                        applyVerdictStamp("LIKELY AI-GENERATED", badgeEl, descEl, "Synthetic credentials detected in file header.");
+                        lastVerdictResult = { verdict: "LIKELY AI-GENERATED" };
                     } else {
-                        applyVerdictStamp("ORIGIN", badgeEl, descEl, "Valid cryptographic provenance seal confirmed.");
-                        lastVerdictResult = { verdict: "ORIGIN" };
+                        applyVerdictStamp("VERIFIED ORIGIN", badgeEl, descEl, "Valid cryptographic provenance seal confirmed.");
+                        lastVerdictResult = { verdict: "VERIFIED ORIGIN" };
                     }
                     return;
                 }
@@ -616,21 +616,21 @@
                     const res = await fetch(`${cleanUrl}/predict/image`, { method: "POST", body: frameData });
                     if (res.ok) {
                         const data = await res.json();
-                        if (data.verdict === "GENERATE") aiVotes++;
-                        if (data.verdict === "NATURAL") naturalVotes++;
+                        if (data.verdict === "LIKELY AI-GENERATED") aiVotes++;
+                        if (data.verdict === "LIKELY NATURAL CAPTURE") naturalVotes++;
                     }
                 }
 
                 let vVerdict = "INCONCLUSIVE";
-                if (aiVotes >= Math.ceil(frames.length * 0.5)) vVerdict = "GENERATE";
-                else if (naturalVotes >= Math.ceil(frames.length * 0.5)) vVerdict = "NATURAL";
+                if (aiVotes >= Math.ceil(frames.length * 0.5)) vVerdict = "LIKELY AI-GENERATED";
+                else if (naturalVotes >= Math.ceil(frames.length * 0.5)) vVerdict = "LIKELY NATURAL CAPTURE";
 
                 applyVerdictStamp(vVerdict, document.getElementById('vidVisualBadge'), document.getElementById('vidVisualDesc'));
 
                 // Audio extraction & verification
                 const extractedWav = await extractAudioFromVideoClient(selectedFile);
                 if (!extractedWav) {
-                    applyVerdictStamp("NO_AUDIO", document.getElementById('vidAudioBadge'), document.getElementById('vidAudioDesc'));
+                    applyVerdictStamp("NO_AUDIO_STREAM", document.getElementById('vidAudioBadge'), document.getElementById('vidAudioDesc'));
                 } else {
                     const audioFormData = new FormData();
                     audioFormData.append("file", extractedWav);
