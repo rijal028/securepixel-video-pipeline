@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SecurePixel - Multimodal Forensic Pipeline</title>
-    <!-- Supabase JS Client -->
+    <title>SecurePixel - Media Authenticity Verifier</title>
+    <!-- Supabase JS Client for Redress Telemetry -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { box-sizing: border-box; }
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            max-width: 680px; 
+            max-width: 600px; 
             margin: 40px auto; 
             padding: 20px; 
             background: #0f172a; 
@@ -23,45 +23,42 @@
             border: 1px solid #334155; 
             box-shadow: 0 10px 25px rgba(0,0,0,0.4); 
         }
-        h1 { margin-top: 0; font-size: 22px; color: #38bdf8; }
-        p.subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
+        h1 { margin-top: 0; font-size: 24px; color: #38bdf8; text-align: center; }
+        p.subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 24px; line-height: 1.5; text-align: center; }
         
-        /* Native Safe File Picker Area */
+        /* File Picker */
         .file-select-area {
             background: #0f172a;
             border: 2px dashed #475569;
-            padding: 20px;
+            padding: 24px 16px;
             border-radius: 12px;
             text-align: center;
-            margin-bottom: 15px;
+            margin-bottom: 16px;
         }
         .file-select-area input[type="file"] {
             display: inline-block;
-            margin: 10px auto;
+            margin: 8px auto;
             color: #94a3b8;
             font-size: 13px;
             cursor: pointer;
         }
         
-        /* Media Preview Box */
+        /* Media Preview */
         #previewContainer {
             display: none;
             margin-bottom: 20px;
             background: #0b0f19;
-            padding: 15px;
-            border-radius: 8px;
+            padding: 12px;
+            border-radius: 10px;
             border: 1px solid #334155;
             text-align: center;
         }
         #previewImage, #previewVideo {
             max-width: 100%;
-            max-height: 280px;
-            border-radius: 6px;
-            border: 1px solid #334155;
-            margin-bottom: 8px;
+            max-height: 260px;
+            border-radius: 8px;
             display: none;
-            margin-left: auto;
-            margin-right: auto;
+            margin: 0 auto 8px auto;
         }
         #previewAudio {
             width: 100%;
@@ -70,16 +67,15 @@
         }
         #previewMeta {
             font-size: 12px;
-            color: #38bdf8;
-            margin-top: 6px;
-            font-weight: 500;
+            color: #64748b;
+            margin-top: 4px;
         }
 
         button.btn-primary { 
             background: #0284c7; 
             color: white; 
             border: none; 
-            padding: 12px 20px; 
+            padding: 14px 20px; 
             font-weight: 600; 
             border-radius: 8px; 
             cursor: pointer; 
@@ -90,57 +86,79 @@
         button.btn-primary:hover { background: #0369a1; }
         button.btn-primary:disabled { background: #475569; cursor: not-allowed; }
         
+        /* Result Stamp Section */
         #resultCard { 
             display: none; 
             margin-top: 25px; 
             padding-top: 20px; 
             border-top: 1px solid #334155; 
         }
-        .badge { display: inline-block; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: bold; }
-        .badge-verified { background: #065f46; color: #34d399; }
-        .badge-inconclusive { background: #78350f; color: #fde68a; }
-        .badge-ai { background: #991b1b; color: #fca5a5; }
-        .badge-natural { background: #065f46; color: #6ee7b7; }
-        .badge-secondary { background: #334155; color: #94a3b8; }
+
+        .verdict-box {
+            background: #0f172a;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid #334155;
+            margin-bottom: 16px;
+        }
+
+        /* Large Clean Badges / Stamps */
+        .stamp-badge {
+            display: inline-block;
+            padding: 8px 18px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        .stamp-generate { background: #7f1d1d; color: #fca5a5; border: 1px solid #ef4444; }
+        .stamp-natural { background: #064e3b; color: #6ee7b7; border: 1px solid #10b981; }
+        .stamp-origin { background: #1e3a8a; color: #93c5fd; border: 1px solid #3b82f6; }
+        .stamp-inconclusive { background: #78350f; color: #fde68a; border: 1px solid #f59e0b; }
+        .stamp-neutral { background: #334155; color: #cbd5e1; border: 1px solid #475569; }
+
+        .verdict-desc {
+            color: #cbd5e1;
+            font-size: 14px;
+            margin: 0;
+            line-height: 1.5;
+        }
         
-        /* Dual-Column Layout for Video Independent Audit */
+        /* Video Dual-Track Clean Grid */
         .video-split-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 12px;
-            margin-top: 12px;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
         .split-card {
             background: #0f172a;
             border: 1px solid #334155;
-            padding: 14px;
-            border-radius: 8px;
+            padding: 16px;
+            border-radius: 10px;
+            text-align: center;
         }
         .split-card h4 {
-            margin: 0 0 8px 0;
+            margin: 0 0 10px 0;
             font-size: 13px;
             color: #94a3b8;
             letter-spacing: 0.5px;
         }
-
-        pre { 
-            background: #0b0f19; 
-            color: #a5f3fc; 
-            padding: 15px; 
-            border-radius: 8px; 
-            font-size: 12px; 
-            overflow-x: auto; 
-            border: 1px solid #1e293b; 
+        .split-card .stamp-badge {
+            font-size: 13px;
+            padding: 6px 12px;
         }
 
         /* Redress Section */
         .flag-container {
-            margin-top: 20px;
+            margin-top: 15px;
             background: #0f172a;
             border: 1px solid #334155;
-            border-radius: 8px;
-            padding: 15px;
+            border-radius: 10px;
+            padding: 14px;
         }
         .flag-header {
             display: flex;
@@ -177,11 +195,12 @@
             background: #dc2626;
             color: white;
             border: none;
-            padding: 8px;
+            padding: 9px;
             font-size: 13px;
             border-radius: 6px;
             width: 100%;
             cursor: pointer;
+            font-weight: 600;
         }
         .btn-submit-flag:hover { background: #b91c1c; }
     </style>
@@ -189,16 +208,16 @@
 <body>
 
 <div class="card">
-    <h1>🛡️ SecurePixel Multimodal Pipeline</h1>
-    <p class="subtitle">Autonomous Provenance (C2PA) & Deepfake Forensics: Visual (Dual ConvNeXt V2), Audio (Dual-Expert 1D Raw), Video Independent Audit.</p>
+    <h1>🛡️ SecurePixel</h1>
+    <p class="subtitle">Authenticate and verify digital media authenticity within a split second.</p>
 
-    <!-- Direct Input Picker -->
+    <!-- File Picker -->
     <div class="file-select-area">
-        <label style="font-size: 13px; color: #cbd5e1; font-weight: bold; display: block; margin-bottom: 8px;">Select File for Forensic Audit:</label>
+        <label style="font-size: 13px; color: #cbd5e1; font-weight: 600; display: block; margin-bottom: 6px;">Choose an image, video, or audio file:</label>
         <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.mp3,.wav,.ogg,.m4a" onchange="handleFileSelected(this)">
     </div>
 
-    <!-- Preview Container -->
+    <!-- Media Preview -->
     <div id="previewContainer">
         <img id="previewImage" alt="Preview">
         <video id="previewVideo" controls></video>
@@ -206,53 +225,50 @@
         <div id="previewMeta"></div>
     </div>
 
-    <button type="button" id="btnSubmit" class="btn-primary" onclick="runPipeline()" disabled>Start Verification</button>
+    <button type="button" id="btnSubmit" class="btn-primary" onclick="runPipeline()" disabled>Verify Authenticity</button>
 
     <div id="resultCard">
-        <!-- Single Track Layout (Image / Audio) -->
+        <!-- Single Track Verdict Box (Image / Audio) -->
         <div id="singleResultContainer">
-            <p><strong>Final Verdict:</strong> <span id="resVerdict" class="badge"></span></p>
-            <p><strong>Forensic Rationale:</strong> <span id="resReason" style="color: #cbd5e1;"></span></p>
-            <p><strong>Execution Route:</strong> <span id="resPipeline" style="color: #38bdf8;"></span></p>
+            <div class="verdict-box">
+                <div id="resBadge" class="stamp-badge"></div>
+                <p id="resDescription" class="verdict-desc"></p>
+            </div>
         </div>
 
-        <!-- Video Dual-Track Layout (Visual & Audio Side-by-Side) -->
+        <!-- Video Dual-Track Verdict Box -->
         <div id="videoResultContainer" style="display: none;">
-            <p><strong>Media Type:</strong> <span class="badge badge-secondary">VIDEO (INDEPENDENT DUAL-TRACK)</span></p>
             <div class="video-split-grid">
                 <div class="split-card">
                     <h4>👁️ VISUAL TRACK</h4>
-                    <p style="margin: 4px 0;"><span id="vidVisualVerdict" class="badge"></span></p>
-                    <p id="vidVisualReason" style="font-size: 12px; color: #cbd5e1; margin-top: 6px;"></p>
+                    <div id="vidVisualBadge" class="stamp-badge"></div>
+                    <p id="vidVisualDesc" class="verdict-desc" style="font-size: 12px;"></p>
                 </div>
                 <div class="split-card">
                     <h4>🎙️ AUDIO TRACK</h4>
-                    <p style="margin: 4px 0;"><span id="vidAudioVerdict" class="badge"></span></p>
-                    <p id="vidAudioReason" style="font-size: 12px; color: #cbd5e1; margin-top: 6px;"></p>
+                    <div id="vidAudioBadge" class="stamp-badge"></div>
+                    <p id="vidAudioDesc" class="verdict-desc" style="font-size: 12px;"></p>
                 </div>
             </div>
         </div>
 
-        <p style="margin-top: 15px; font-size: 13px; color: #94a3b8;">Detailed Forensic Metrics:</p>
-        <pre id="resData"></pre>
-
-        <!-- Redress Section -->
+        <!-- Discrepancy & Redress -->
         <div class="flag-container">
             <div class="flag-header">
-                <span style="font-size: 13px; color: #94a3b8;">Think this verdict is inaccurate?</span>
-                <button type="button" class="btn-flag" onclick="toggleFlagForm()">Flag Discrepancy</button>
+                <span style="font-size: 13px; color: #94a3b8;">Believe this result is inaccurate?</span>
+                <button type="button" class="btn-flag" onclick="toggleFlagForm()">Flag Result</button>
             </div>
             <div id="flagForm" class="flag-form">
-                <label style="font-size: 12px; color: #cbd5e1; display: block; margin-bottom: 4px;">Discrepancy Category:</label>
+                <label style="font-size: 12px; color: #cbd5e1; display: block; margin-bottom: 4px;">Issue Type:</label>
                 <select id="flagType">
-                    <option value="false_positive">False Positive (Genuine media flagged as AI)</option>
-                    <option value="false_negative">False Negative (AI media detected as Natural/Genuine)</option>
-                    <option value="other">Other Inconsistency / Corrupted Metadata</option>
+                    <option value="false_positive">Genuine media flagged as AI</option>
+                    <option value="false_negative">AI media flagged as Authentic</option>
+                    <option value="other">Inconclusive or unexpected result</option>
                 </select>
-                <label style="font-size: 12px; color: #cbd5e1; display: block; margin-bottom: 4px;">Context / Camera Notes (Optional):</label>
-                <textarea id="flagNotes" rows="2" placeholder="e.g., Captured using Sony A7IV or Generated via Sora..."></textarea>
-                <button type="button" id="btnSendFlag" class="btn-submit-flag" onclick="submitTelemetryFlag()">Submit Forensic Log</button>
-                <p id="flagSuccess" style="display: none; font-size: 12px; color: #34d399; margin-top: 8px;">Log submitted to triage database. Zero biometric or raw media was stored.</p>
+                <label style="font-size: 12px; color: #cbd5e1; display: block; margin-bottom: 4px;">Context (Optional):</label>
+                <textarea id="flagNotes" rows="2" placeholder="e.g., Captured on Sony A7IV or generated via Midjourney..."></textarea>
+                <button type="button" id="btnSendFlag" class="btn-submit-flag" onclick="submitTelemetryFlag()">Submit Feedback</button>
+                <p id="flagSuccess" style="display: none; font-size: 12px; color: #34d399; margin-top: 8px; text-align: center;">Feedback recorded. Zero biometric or personal media was stored.</p>
             </div>
         </div>
     </div>
@@ -260,12 +276,11 @@
 
 <script>
     // =========================================================================
-    // CLOUDFLARE TUNNEL URL (Update matching active Kaggle cell output)
+    // CLOUDFLARE TUNNEL URL (Sinkronkan dengan output Kaggle)
     // =========================================================================
-    const DEFAULT_BACKEND_URL = "https://proven-programming-suit-ion.trycloudflare.com";
+    const DEFAULT_BACKEND_URL = "https://loaded-prime-moment-passengers.trycloudflare.com";
     // =========================================================================
 
-    // Supabase safe client
     let sbClient = null;
     try {
         if (window.supabase && typeof window.supabase.createClient === "function") {
@@ -279,7 +294,7 @@
     }
 
     let selectedFile = null;
-    let currentInferenceData = null;
+    let lastVerdictResult = null;
     let currentObjectUrl = null;
 
     function handleFileSelected(inputElement) {
@@ -289,7 +304,7 @@
 
         const btn = document.getElementById('btnSubmit');
         btn.disabled = false;
-        btn.innerText = "Start Verification";
+        btn.innerText = "Verify Authenticity";
 
         try {
             const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(2);
@@ -323,13 +338,13 @@
             }
 
             pContainer.style.display = "block";
-            pMeta.innerText = `${fileName} • ${sizeMB} MB • ${fileType || 'binary format'}`;
+            pMeta.innerText = `${fileName} • ${sizeMB} MB`;
         } catch (err) {
-            console.error("Preview render non-fatal error:", err);
+            console.error("Preview render error:", err);
         }
     }
 
-    // Client-side C2PA Inspector (Fast scan up to 2MB)
+    // Client-side C2PA Check
     async function inspectClientC2PA(file) {
         const readSize = Math.min(file.size, 2097152);
         const slice = file.slice(0, readSize);
@@ -340,27 +355,19 @@
         const hasContainer = text.includes("c2pa") || text.includes("urn:c2pa") || text.includes("jumb");
         if (!hasContainer) return { detected: false };
 
-        const syntheticMarkers = [
-            "trainedalgorithmicmedia",
-            "generativesynthesis",
-            "c2pa.synthetic",
-            "synthid",
-            "dall-e",
-            "midjourney",
-            "gemini"
-        ];
+        const syntheticMarkers = ["trainedalgorithmicmedia", "generativesynthesis", "c2pa.synthetic", "synthid", "dall-e", "midjourney", "gemini"];
         const isSynthetic = syntheticMarkers.some(m => text.includes(m));
 
         return {
             detected: true,
-            isSynthetic: isSynthetic,
-            claimType: isSynthetic ? "Synthetic Algorithmic Manifest" : "Authentic C2PA Content Credentials Seal"
+            isSynthetic: isSynthetic
         };
     }
 
+    // Perceptual hash untuk feedback aman (tanpa simpan foto)
     async function computePerceptualHash(file) {
         if (!file.type.startsWith("image/")) {
-            return "stream_metric_" + file.size;
+            return "stream_id_" + file.size;
         }
         return new Promise((resolve) => {
             const img = new Image();
@@ -392,8 +399,8 @@
         });
     }
 
-    // Client-side Keyframe Extraction (1 Frame per 1 Second Duration)
-    async function extractVideoKeyframes(videoFile, maxFramesCap = 10) {
+    // Ekstraksi frame video di browser
+    async function extractVideoKeyframes(videoFile, maxFramesCap = 6) {
         return new Promise((resolve, reject) => {
             const video = document.createElement("video");
             video.preload = "metadata";
@@ -403,12 +410,11 @@
 
             video.onerror = () => {
                 URL.revokeObjectURL(video.src);
-                reject(new Error("Decoder failed to extract frames from video container."));
+                reject(new Error("Unable to read video frames."));
             };
 
             video.onloadedmetadata = async () => {
                 const durationSec = Math.floor(video.duration);
-                // 1 frame per 1 second duration (minimum 1 frame, capped at maxFramesCap)
                 const frameCount = Math.min(Math.max(durationSec, 1), maxFramesCap);
 
                 const canvas = document.createElement("canvas");
@@ -423,7 +429,7 @@
 
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.90));
-                    frames.push(new File([blob], `frame_sec_${i}.jpg`, { type: "image/jpeg" }));
+                    frames.push(new File([blob], `frame_${i}.jpg`, { type: "image/jpeg" }));
                 }
 
                 URL.revokeObjectURL(video.src);
@@ -432,7 +438,7 @@
         });
     }
 
-    // Client-side Audio Extraction via Web Audio API (Transfers only ~128KB to backend)
+    // Ekstraksi audio browser via Web Audio API
     async function extractAudioFromVideoClient(videoFile) {
         try {
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -440,7 +446,6 @@
             const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
             const targetSampleRate = 16000;
-            // Capture actual duration up to 4.5 seconds for 64,600 raw samples input
             const captureDuration = Math.min(audioBuffer.duration, 4.5);
             const offlineCtx = new OfflineAudioContext(1, Math.floor(targetSampleRate * captureDuration), targetSampleRate);
             
@@ -452,17 +457,14 @@
             const renderedBuffer = await offlineCtx.startRendering();
             const channelData = renderedBuffer.getChannelData(0);
 
-            // Encode to standard 16-bit PCM Mono WAV file
             const wavBytes = encodeWAV(channelData, targetSampleRate);
             const wavBlob = new Blob([wavBytes], { type: "audio/wav" });
-            return new File([wavBlob], "extracted_audio.wav", { type: "audio/wav" });
+            return new File([wavBlob], "audio_track.wav", { type: "audio/wav" });
         } catch (e) {
-            console.warn("Audio track missing or unreadable by AudioContext:", e);
             return null;
         }
     }
 
-    // Native Browser WAV Encoder
     function encodeWAV(samples, sampleRate) {
         const buffer = new ArrayBuffer(44 + samples.length * 2);
         const view = new DataView(buffer);
@@ -478,8 +480,8 @@
         writeString(8, 'WAVE');
         writeString(12, 'fmt ');
         view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true); // PCM format
-        view.setUint16(22, 1, true); // Mono channel
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
         view.setUint32(24, sampleRate, true);
         view.setUint32(28, sampleRate * 2, true);
         view.setUint16(32, 2, true);
@@ -496,18 +498,28 @@
         return buffer;
     }
 
-    function setBadgeStyle(verdict, element) {
-        element.innerText = verdict;
-        if (verdict === "LIKELY AI-GENERATED") {
-            element.className = "badge badge-ai";
-        } else if (verdict === "LIKELY NATURAL CAPTURE") {
-            element.className = "badge badge-natural";
-        } else if (verdict === "VERIFIED ORIGIN") {
-            element.className = "badge badge-verified";
-        } else if (verdict === "NO_AUDIO_STREAM" || verdict === "AUDIO_CORRUPTED_OR_TOO_SHORT") {
-            element.className = "badge badge-secondary";
+    // Terapkan 4 Stempel Resmi
+    function applyVerdictStamp(verdict, badgeEl, descEl, customDesc) {
+        if (verdict === "GENERATE" || verdict === "LIKELY AI-GENERATED") {
+            badgeEl.className = "stamp-badge stamp-generate";
+            badgeEl.innerText = "🤖 AI-GENERATED";
+            descEl.innerText = customDesc || "Synthetic latent generative traits identified.";
+        } else if (verdict === "NATURAL" || verdict === "LIKELY NATURAL CAPTURE") {
+            badgeEl.className = "stamp-badge stamp-natural";
+            badgeEl.innerText = "📷 AUTHENTIC CAMERA";
+            descEl.innerText = customDesc || "Physical optical sensor traits verified.";
+        } else if (verdict === "ORIGIN" || verdict === "VERIFIED ORIGIN") {
+            badgeEl.className = "stamp-badge stamp-origin";
+            badgeEl.innerText = "🛡️ VERIFIED SOURCE";
+            descEl.innerText = customDesc || "Valid cryptographic provenance seal confirmed.";
+        } else if (verdict === "NO_AUDIO") {
+            badgeEl.className = "stamp-badge stamp-neutral";
+            badgeEl.innerText = "NO AUDIO TRACK";
+            descEl.innerText = "No audio stream detected.";
         } else {
-            element.className = "badge badge-inconclusive";
+            badgeEl.className = "stamp-badge stamp-inconclusive";
+            badgeEl.innerText = "⚠️ INCONCLUSIVE";
+            descEl.innerText = customDesc || "Ambiguous signals; system safely abstained.";
         }
     }
 
@@ -517,14 +529,14 @@
     }
 
     async function submitTelemetryFlag() {
-        if (!currentInferenceData) return;
+        if (!lastVerdictResult) return;
         const btn = document.getElementById('btnSendFlag');
         const successEl = document.getElementById('flagSuccess');
         btn.disabled = true;
-        btn.innerText = "Dispatching Telemetry...";
+        btn.innerText = "Submitting...";
 
         try {
-            if (!sbClient) throw new Error("Supabase client connection not initialized.");
+            if (!sbClient) throw new Error("Feedback service unavailable.");
 
             const phash = await computePerceptualHash(selectedFile);
             const flagPayload = {
@@ -532,15 +544,7 @@
                 phash: phash,
                 reported_error: document.getElementById('flagType').value,
                 user_notes: document.getElementById('flagNotes').value.trim(),
-                system_verdict: currentInferenceData.verdict || "VIDEO_INDEPENDENT_AUDIT",
-                system_confidence: parseFloat(currentInferenceData.confidence || currentInferenceData.calibrated_confidence || 0.0),
-                physical_metrics: {
-                    laplacian_variance: currentInferenceData.laplacian_variance || (currentInferenceData.metrics ? currentInferenceData.metrics.sharpness_score : null),
-                    fft_phase_score: currentInferenceData.phase_score || null,
-                    spectral_rolloff: currentInferenceData.spectral_rolloff || null,
-                    zcr: currentInferenceData.zero_crossing_rate || null
-                },
-                model_logits: currentInferenceData.raw_scores || currentInferenceData.metrics || {},
+                system_verdict: lastVerdictResult.verdict || "UNKNOWN",
                 is_verified: false
             };
 
@@ -548,11 +552,11 @@
             if (error) throw error;
 
             successEl.style.display = "block";
-            btn.innerText = "Dispatched Successfully";
+            btn.innerText = "Submitted";
         } catch (err) {
-            alert("Failed to submit telemetry: " + err.message);
+            alert("Error submitting feedback: " + err.message);
             btn.disabled = false;
-            btn.innerText = "Submit Forensic Log";
+            btn.innerText = "Submit Feedback";
         }
     }
 
@@ -563,8 +567,9 @@
         const resultCard = document.getElementById('resultCard');
         const singleContainer = document.getElementById('singleResultContainer');
         const videoContainer = document.getElementById('videoResultContainer');
-        const verdictEl = document.getElementById('resVerdict');
-        const rawEndpoint = DEFAULT_BACKEND_URL ? DEFAULT_BACKEND_URL.trim() : "";
+        const badgeEl = document.getElementById('resBadge');
+        const descEl = document.getElementById('resDescription');
+        const cleanUrl = DEFAULT_BACKEND_URL.replace(/\/+$/, "");
 
         btn.disabled = true;
         resultCard.style.display = "none";
@@ -577,238 +582,103 @@
         const isAudio = selectedFile.type.startsWith("audio/") || /\.(mp3|wav|ogg|m4a)$/i.test(selectedFile.name);
 
         try {
-            // -----------------------------------------------------------------
-            // STAGE 0: FAST CLIENT-SIDE C2PA CHECK (INSTANT ZERO-COST)
-            // -----------------------------------------------------------------
+            // C2PA Quick Check
             if (!isAudio) {
-                btn.innerText = "Scanning file header for C2PA provenance...";
-                const clientC2PA = await inspectClientC2PA(selectedFile);
-                if (clientC2PA.detected) {
+                btn.innerText = "Checking file credentials...";
+                const c2pa = await inspectClientC2PA(selectedFile);
+                if (c2pa.detected) {
                     resultCard.style.display = "block";
-                    singleContainer.style.display = "block";
-                    videoContainer.style.display = "none";
-                    if (clientC2PA.isSynthetic) {
-                        setBadgeStyle("LIKELY AI-GENERATED", verdictEl);
-                        document.getElementById('resReason').innerText = "C2PA assertion explicitly certifies synthetic or algorithmic origin.";
-                        document.getElementById('resPipeline').innerText = "Client-Side C2PA Manifest Inspector (Zero GPU Cost)";
-                        currentInferenceData = { verdict: "LIKELY AI-GENERATED", confidence: 1.0, reason: clientC2PA.claimType };
+                    if (c2pa.isSynthetic) {
+                        applyVerdictStamp("GENERATE", badgeEl, descEl, "Synthetic credentials detected in file header.");
+                        lastVerdictResult = { verdict: "GENERATE" };
                     } else {
-                        setBadgeStyle("VERIFIED ORIGIN", verdictEl);
-                        document.getElementById('resReason').innerText = "Valid C2PA Content Credentials cryptographic provenance verified.";
-                        document.getElementById('resPipeline').innerText = "Client-Side C2PA Root Verification (Zero GPU Cost)";
-                        currentInferenceData = { verdict: "VERIFIED ORIGIN", confidence: 1.0, reason: clientC2PA.claimType };
+                        applyVerdictStamp("ORIGIN", badgeEl, descEl, "Valid cryptographic provenance seal confirmed.");
+                        lastVerdictResult = { verdict: "ORIGIN" };
                     }
-                    document.getElementById('resData').innerText = JSON.stringify(currentInferenceData, null, 2);
-                    btn.innerText = "Start Verification";
-                    btn.disabled = false;
                     return;
                 }
             }
 
-            // -----------------------------------------------------------------
-            // STAGE 1: VERCEL EDGE GATEWAY (/api/analyze) (SAFE BYPASS IF LOCAL)
-            // -----------------------------------------------------------------
-            btn.innerText = "Checking physical envelope guardrail...";
-            let edgeResult = null;
-            try {
-                const edgeFormData = new FormData();
-                edgeFormData.append("file", selectedFile);
-
-                const edgeRes = await fetch("/api/analyze", {
-                    method: "POST",
-                    body: edgeFormData
-                });
-                if (edgeRes.ok) {
-                    edgeResult = await edgeRes.json();
-                }
-            } catch (e) {
-                console.warn("Edge gateway endpoint unreachable, continuing to neural inference.");
-            }
-
-            if (edgeResult && edgeResult.status === "STOP") {
-                resultCard.style.display = "block";
-                setBadgeStyle(edgeResult.verdict, verdictEl);
-                document.getElementById('resReason').innerText = edgeResult.reason;
-                document.getElementById('resPipeline').innerText = "Vercel Edge Guardrail (C2PA / Physical Envelope)";
-                currentInferenceData = edgeResult;
-                document.getElementById('resData').innerText = JSON.stringify(edgeResult, null, 2);
-                btn.innerText = "Start Verification";
-                btn.disabled = false;
-                return;
-            }
-
-            // -----------------------------------------------------------------
-            // STAGE 2: BACKEND INFERENCE VIA CLOUDFLARE
-            // -----------------------------------------------------------------
-            if (!rawEndpoint || rawEndpoint.includes("xxxx-xxxx")) {
-                throw new Error("Please specify a valid Cloudflare Tunnel URL in DEFAULT_BACKEND_URL.");
-            }
-
-            const cleanUrl = rawEndpoint.replace(/\/+$/, "");
-
-            // -----------------------------------------------------------------
-            // WORKFLOW A: VIDEO DUAL-TRACK (1 FRAME/SEC + AUDIOCONTEXT)
-            // -----------------------------------------------------------------
+            // Video Dual-Track Flow
             if (isVideo) {
+                btn.innerText = "Analyzing video frames...";
                 resultCard.style.display = "block";
                 singleContainer.style.display = "none";
                 videoContainer.style.display = "block";
 
-                // 1. Visual Keyframe Extraction (1 frame per second)
-                btn.innerText = "Extracting visual frames (1 frame/sec) via Canvas...";
-                const frames = await extractVideoKeyframes(selectedFile, 10);
-                const frameResults = [];
+                const frames = await extractVideoKeyframes(selectedFile, 6);
+                let aiVotes = 0;
+                let naturalVotes = 0;
 
                 for (let i = 0; i < frames.length; i++) {
-                    btn.innerText = `Analyzing visual frame ${i + 1} of ${frames.length} via Dual ConvNeXt V2...`;
                     const frameData = new FormData();
                     frameData.append("file", frames[i]);
-
-                    const res = await fetch(`${cleanUrl}/predict/image`, {
-                        method: "POST",
-                        body: frameData
-                    });
-
-                    if (!res.ok) {
-                        const err = await res.text();
-                        throw new Error(`Visual engine error on frame ${i + 1}: ${err.substring(0, 100)}`);
+                    const res = await fetch(`${cleanUrl}/predict/image`, { method: "POST", body: frameData });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.verdict === "GENERATE") aiVotes++;
+                        if (data.verdict === "NATURAL") naturalVotes++;
                     }
-                    const data = await res.json();
-                    frameResults.push(data);
                 }
 
-                const aiVotes = frameResults.filter(r => r.verdict === "LIKELY AI-GENERATED").length;
-                const naturalVotes = frameResults.filter(r => r.verdict === "LIKELY NATURAL CAPTURE").length;
+                let vVerdict = "INCONCLUSIVE";
+                if (aiVotes >= Math.ceil(frames.length * 0.5)) vVerdict = "GENERATE";
+                else if (naturalVotes >= Math.ceil(frames.length * 0.5)) vVerdict = "NATURAL";
 
-                let visualFinalVerdict = "INCONCLUSIVE";
-                let visualFinalReason = "Visual signals across sampled frames remain within ambiguous boundaries.";
+                applyVerdictStamp(vVerdict, document.getElementById('vidVisualBadge'), document.getElementById('vidVisualDesc'));
 
-                if (aiVotes >= Math.ceil(frameResults.length * 0.5)) {
-                    visualFinalVerdict = "LIKELY AI-GENERATED";
-                    visualFinalReason = `Synthetic generative signatures verified across ${aiVotes} of ${frameResults.length} sampled visual frames (1 frame/sec).`;
-                } else if (naturalVotes >= Math.ceil(frameResults.length * 0.5)) {
-                    visualFinalVerdict = "LIKELY NATURAL CAPTURE";
-                    visualFinalReason = `Authentic optical camera characteristics confirmed across ${naturalVotes} of ${frameResults.length} sampled visual frames (1 frame/sec).`;
-                }
-
-                setBadgeStyle(visualFinalVerdict, document.getElementById('vidVisualVerdict'));
-                document.getElementById('vidVisualReason').innerText = visualFinalReason;
-
-                // 2. Client-side Audio Stream Extraction via Web Audio API
-                btn.innerText = "Decoding audio stream via AudioContext...";
+                // Audio extraction & verification
                 const extractedWav = await extractAudioFromVideoClient(selectedFile);
-                let audioFinalData = null;
-
                 if (!extractedWav) {
-                    setBadgeStyle("NO_AUDIO_STREAM", document.getElementById('vidAudioVerdict'));
-                    document.getElementById('vidAudioReason').innerText = "Video container does not contain an accessible audio stream.";
-                    audioFinalData = { verdict: "NO_AUDIO_STREAM", reason: "Audio track missing or unreadable." };
+                    applyVerdictStamp("NO_AUDIO", document.getElementById('vidAudioBadge'), document.getElementById('vidAudioDesc'));
                 } else {
-                    btn.innerText = "Analyzing audio waveform via Dual-Expert 1D Net...";
                     const audioFormData = new FormData();
                     audioFormData.append("file", extractedWav);
-
-                    const resAudio = await fetch(`${cleanUrl}/predict/audio`, {
-                        method: "POST",
-                        body: audioFormData
-                    });
-
+                    const resAudio = await fetch(`${cleanUrl}/predict/audio`, { method: "POST", body: audioFormData });
                     if (resAudio.ok) {
-                        audioFinalData = await resAudio.json();
-                        setBadgeStyle(audioFinalData.verdict, document.getElementById('vidAudioVerdict'));
-                        document.getElementById('vidAudioReason').innerText = audioFinalData.reason;
+                        const aData = await resAudio.json();
+                        applyVerdictStamp(aData.verdict, document.getElementById('vidAudioBadge'), document.getElementById('vidAudioDesc'), aData.description);
                     } else {
-                        setBadgeStyle("INCONCLUSIVE", document.getElementById('vidAudioVerdict'));
-                        document.getElementById('vidAudioReason').innerText = "Audio forensic analysis could not be completed by backend.";
-                        audioFinalData = { verdict: "ERROR", reason: "Audio endpoint failed." };
+                        applyVerdictStamp("INCONCLUSIVE", document.getElementById('vidAudioBadge'), document.getElementById('vidAudioDesc'));
                     }
                 }
 
-                currentInferenceData = {
-                    media_type: "video",
-                    client_extracted: true,
-                    sampling_strategy: "1 frame per second (capped at 10)",
-                    visual_forensics: {
-                        verdict: visualFinalVerdict,
-                        reason: visualFinalReason,
-                        total_sampled_frames: frames.length,
-                        ai_votes: aiVotes,
-                        natural_votes: naturalVotes,
-                        frame_details: frameResults
-                    },
-                    audio_forensics: audioFinalData
-                };
-
-                document.getElementById('resData').innerText = JSON.stringify(currentInferenceData, null, 2);
+                lastVerdictResult = { verdict: vVerdict };
                 return;
             }
 
-            // -------------------------------------------------------------
-            // WORKFLOW B: AUDIO DETECTION (1D DUAL-EXPERT)
-            // -------------------------------------------------------------
+            // Audio Flow
             if (isAudio) {
-                btn.innerText = "Analyzing acoustic spectrum via 1D Dual-Expert...";
+                btn.innerText = "Verifying acoustic dynamics...";
                 const formData = new FormData();
                 formData.append("file", selectedFile);
-
-                const res = await fetch(`${cleanUrl}/predict/audio`, {
-                    method: "POST",
-                    body: formData
-                });
-
-                if (!res.ok) {
-                    const err = await res.text();
-                    throw new Error(`Audio engine error (${res.status}): ${err.substring(0, 120)}`);
-                }
-
+                const res = await fetch(`${cleanUrl}/predict/audio`, { method: "POST", body: formData });
+                if (!res.ok) throw new Error("Audio verification service failed.");
+                
                 const data = await res.json();
                 resultCard.style.display = "block";
-                singleContainer.style.display = "block";
-                videoContainer.style.display = "none";
-
-                setBadgeStyle(data.verdict, verdictEl);
-                document.getElementById('resReason').innerText = data.reason;
-                document.getElementById('resPipeline').innerText = data.execution_route || "1D Waveform Dual-Expert Veto";
-                
-                currentInferenceData = data;
-                document.getElementById('resData').innerText = JSON.stringify(data, null, 2);
+                applyVerdictStamp(data.verdict, badgeEl, descEl, data.description);
+                lastVerdictResult = data;
                 return;
             }
 
-            // -------------------------------------------------------------
-            // WORKFLOW C: SINGLE IMAGE
-            // -------------------------------------------------------------
-            btn.innerText = "Executing visual Dual ConvNeXt V2 + Spectral 2D FFT inference...";
+            // Image Flow
+            btn.innerText = "Analyzing image sensor characteristics...";
             const formData = new FormData();
             formData.append("file", selectedFile);
+            const res = await fetch(`${cleanUrl}/predict/image`, { method: "POST", body: formData });
+            if (!res.ok) throw new Error("Image verification service failed.");
 
-            const resBackend = await fetch(`${cleanUrl}/predict/image`, {
-                method: "POST",
-                body: formData
-            });
-
-            if (!resBackend.ok) {
-                const errDetail = await resBackend.text();
-                throw new Error(`Backend error (${resBackend.status}): ${errDetail.substring(0, 120)}`);
-            }
-
-            const dataBackend = await resBackend.json();
+            const data = await res.json();
             resultCard.style.display = "block";
-            singleContainer.style.display = "block";
-            videoContainer.style.display = "none";
-
-            setBadgeStyle(dataBackend.verdict, verdictEl);
-            document.getElementById('resReason').innerText = dataBackend.reason;
-            document.getElementById('resPipeline').innerText = dataBackend.execution_route || "Dual ConvNeXt V2 (512px) + Deadlock Veto";
-            
-            currentInferenceData = dataBackend;
-            document.getElementById('resData').innerText = JSON.stringify(dataBackend, null, 2);
+            applyVerdictStamp(data.verdict, badgeEl, descEl, data.description);
+            lastVerdictResult = data;
 
         } catch (err) {
-            console.error("Forensic execution fault:", err);
-            alert("System exception: " + err.message);
+            console.error("Verification error:", err);
+            alert("Verification failed: " + err.message);
         } finally {
-            btn.innerText = "Start Verification";
+            btn.innerText = "Verify Authenticity";
             btn.disabled = false;
         }
     }
