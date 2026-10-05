@@ -278,7 +278,7 @@
     // =========================================================================
     // CLOUDFLARE TUNNEL URL (Sinkronkan dengan output cell Kaggle yang aktif)
     // =========================================================================
-    const DEFAULT_BACKEND_URL = "https://criticism-libraries-daughters-src.trycloudflare.com";
+    const DEFAULT_BACKEND_URL = "https://inform-guitars-starting-against.trycloudflare.com";
     // =========================================================================
 
     let sbClient = null;
@@ -338,7 +338,7 @@
             }
 
             pContainer.style.display = "block";
-            pMeta.innerText = `${fileName} • ${sizeMB} MB`;
+            pMeta.innerText = `${fileName} (${sizeMB} MB)`;
         } catch (err) {
             console.error("Preview render error:", err);
         }
@@ -438,7 +438,7 @@
         });
     }
 
-    // Ekstraksi audio browser via Web Audio API
+    // Ekstraksi audio browser via Web Audio API (hingga 12 detik)
     async function extractAudioFromVideoClient(videoFile) {
         try {
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -446,7 +446,7 @@
             const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
             const targetSampleRate = 16000;
-            const captureDuration = Math.min(audioBuffer.duration, 4.5);
+            const captureDuration = Math.min(audioBuffer.duration, 12.0);
             const offlineCtx = new OfflineAudioContext(1, Math.floor(targetSampleRate * captureDuration), targetSampleRate);
             
             const source = offlineCtx.createBufferSource();
@@ -498,7 +498,7 @@
         return buffer;
     }
 
-    // Terapkan Stempel Resmi Sesuai Dokumen Benchmark
+    // Terapkan Stempel Resmi
     function applyVerdictStamp(verdict, badgeEl, descEl, customDesc) {
         if (verdict === "LIKELY AI-GENERATED") {
             badgeEl.className = "stamp-badge stamp-generate";
