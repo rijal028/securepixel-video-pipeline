@@ -211,10 +211,10 @@
     <h1>🛡️ SecurePixel</h1>
     <p class="subtitle">Authenticate and verify digital media authenticity within a split second.</p>
 
-    <!-- File Picker -->
+    <!-- File Picker: Mendukung ragam format audio lossy & lossless -->
     <div class="file-select-area">
         <label style="font-size: 13px; color: #cbd5e1; font-weight: 600; display: block; margin-bottom: 6px;">Choose an image, video, or audio file:</label>
-        <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.mp3,.wav,.ogg,.m4a" onchange="handleFileSelected(this)">
+        <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.mp3,.wav,.ogg,.m4a,.aac,.opus,.flac" onchange="handleFileSelected(this)">
     </div>
 
     <!-- Media Preview -->
@@ -266,7 +266,7 @@
                     <option value="other">Inconclusive or unexpected result</option>
                 </select>
                 <label style="font-size: 12px; color: #cbd5e1; display: block; margin-bottom: 4px;">Context (Optional):</label>
-                <textarea id="flagNotes" rows="2" placeholder="e.g., Captured on Sony A7IV or generated via Midjourney..."></textarea>
+                <textarea id="flagNotes" rows="2" placeholder="e.g., Captured on Sony A7IV or recorded via WhatsApp..."></textarea>
                 <button type="button" id="btnSendFlag" class="btn-submit-flag" onclick="submitTelemetryFlag()">Submit Feedback</button>
                 <p id="flagSuccess" style="display: none; font-size: 12px; color: #34d399; margin-top: 8px; text-align: center;">Feedback recorded. Zero biometric or personal media was stored.</p>
             </div>
@@ -278,7 +278,7 @@
     // =========================================================================
     // CLOUDFLARE TUNNEL URL (Sinkronkan dengan output cell Kaggle yang aktif)
     // =========================================================================
-    const DEFAULT_BACKEND_URL = "https://acoustic-saskatchewan-discovered-jewellery.trycloudflare.com";
+    const DEFAULT_BACKEND_URL = "https://intent-materials-salem-lip.trycloudflare.com";
     // =========================================================================
 
     let sbClient = null;
@@ -329,7 +329,7 @@
             if (fileType.startsWith("video/")) {
                 pVid.src = currentObjectUrl;
                 pVid.style.display = "block";
-            } else if (fileType.startsWith("audio/") || /\.(mp3|wav|ogg|m4a)$/i.test(fileName)) {
+            } else if (fileType.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|aac|opus|flac)$/i.test(fileName)) {
                 pAud.src = currentObjectUrl;
                 pAud.style.display = "block";
             } else {
@@ -364,7 +364,7 @@
         };
     }
 
-    // Perceptual hash untuk feedback aman (tanpa simpan media mentah)
+    // Perceptual hash untuk feedback aman
     async function computePerceptualHash(file) {
         if (!file.type.startsWith("image/")) {
             return "stream_id_" + file.size;
@@ -507,7 +507,7 @@
         } else if (verdict === "LIKELY NATURAL CAPTURE") {
             badgeEl.className = "stamp-badge stamp-natural";
             badgeEl.innerText = "📷 LIKELY NATURAL CAPTURE";
-            descEl.innerText = customDesc || "Physical camera sensor optical noise confirmed.";
+            descEl.innerText = customDesc || "Physical sensor dynamics confirmed.";
         } else if (verdict === "VERIFIED ORIGIN") {
             badgeEl.className = "stamp-badge stamp-origin";
             badgeEl.innerText = "🛡️ VERIFIED ORIGIN";
@@ -518,7 +518,7 @@
             descEl.innerText = "No audio stream detected.";
         } else {
             badgeEl.className = "stamp-badge stamp-inconclusive";
-            badgeEl.innerText = "⚠️ INCONCLUSIVE";
+            badgeEl.innerText = "⚠️️ INCONCLUSIVE";
             descEl.innerText = customDesc || "Ambiguous forensic signals; system safely abstained.";
         }
     }
@@ -579,7 +579,7 @@
         document.getElementById('flagSuccess').style.display = "none";
 
         const isVideo = selectedFile.type.startsWith("video/");
-        const isAudio = selectedFile.type.startsWith("audio/") || /\.(mp3|wav|ogg|m4a)$/i.test(selectedFile.name);
+        const isAudio = selectedFile.type.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|aac|opus|flac)$/i.test(selectedFile.name);
 
         try {
             // C2PA Quick Check
